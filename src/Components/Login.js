@@ -3,6 +3,9 @@ import React, { useEffect, useRef, useState } from 'react'
 // import { useNavigate } from 'react-router-dom';
 function Login() {
 
+    
+    const getConfirmPassword = useRef('')
+
  const [CreateAccount,setCreateAccount] = useState(0)
 const[LoginStatus,setLoginStatus] = useState(0)
 // const navigate = useNavigate(); 
@@ -59,6 +62,34 @@ const SwitchToLogin = () =>{
 
 }
 
+const [RegisterStatus,setRegisterStatus] = useState(0)
+
+const RegisterUser = ()=>{
+
+    var myData = {EmailId:EmailId.current.value,Password:Password.current.value,ConfirmPassword:getConfirmPassword.current.value}
+
+
+    axios.post("http://localhost:9000/api/register",myData)
+    .then(response=>{
+
+        if(response.data.message && response.data[0].EmailId === EmailId.current.value
+            && response.data[0].Password === Password.current.value
+        ){
+
+            setRegisterStatus(1)
+            setTimeout(()=>{
+
+                setRegisterStatus(0)
+
+            },1000)
+            
+        }
+        else
+            alert("User Already Exists")
+            
+    })
+}
+
   return (
     <div className='flex z-50 flex-row'>
         {LoginStatus ?
@@ -72,6 +103,13 @@ const SwitchToLogin = () =>{
          <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
          <div className="shadow-custom-blue w-[400px] rounded-3xl bg-[#FA7275] h-[60px] flex items-center justify-center">
            <h1 className="text-white text-2xl text-center">Incorrect Email Id or Password</h1>
+         </div>
+       </div>:null}
+
+       {RegisterStatus ?
+         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
+         <div className="shadow-custom-blue w-[300px] rounded-3xl bg-[#FA7275] h-[60px] flex items-center justify-center">
+           <h1 className="text-white text-2xl text-center">User Registered</h1>
          </div>
        </div>:null}
 
@@ -116,6 +154,8 @@ const SwitchToLogin = () =>{
                     <div className="bg-white shadow-custom-blue rounded-2xl w-[600px] h-[90px] p-4">
                         <h1 className="text-left mb-2">Password</h1>
                         <input 
+                            type="password"
+                            
                             ref = {Password}
                             placeholder="Enter your Password" 
                             className="w-full text-left border-none rounded focus:outline-none focus:ring-0" 
@@ -126,6 +166,8 @@ const SwitchToLogin = () =>{
                     <div className="bg-white shadow-custom-blue rounded-2xl w-[600px] h-[90px] p-4">
                         <h1 className="text-left mb-2">Confirm Password</h1>
                         <input 
+                            type="password"
+                            ref={getConfirmPassword}
                             placeholder="Re-Enter your Password" 
                             className="w-full text-left border-none rounded focus:outline-none focus:ring-0" 
                             />
@@ -133,7 +175,7 @@ const SwitchToLogin = () =>{
 
                     {!CreateAccount ?
                     <button onClick={authenticate} className='bg-[#FA7275] h-[60px] cursor-pointer w-[600px] font-medium mt-30px shadow-custom-blue rounded-full text-white' >Login</button>
-                    :<button className='bg-[#FA7275] h-[60px] cursor-pointer w-[600px] font-medium mt-30px shadow-custom-blue rounded-full text-white' >Create Account</button>}
+                    :<button onClick={RegisterUser} className='bg-[#FA7275] h-[60px] cursor-pointer w-[600px] font-medium mt-30px shadow-custom-blue rounded-full text-white' >Create Account</button>}
 
                         
                         {CreateAccount ? 

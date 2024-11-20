@@ -93,62 +93,30 @@ const storage = multer.diskStorage({
   });
   
 
-
-
-// App.listen(PORT,err=>{
-
-//     if(err)
-//         console.log(err)
-//     else
-//         console.log("Server Running at port "+PORT)
-// })
-
-// const express = require('express');
-// const jwt = require('jsonwebtoken');
-// const bcrypt = require('bcryptjs');
-// const cors = require('cors');
-// const bp = require('body-parser');
-// const myDb = require('./MongoDb'); // Assuming MongoDB is set up correctly
-// const App = new express();
-// const PORT = 9000;
-
-// const JWT_SECRET = '@12@324';  // Store this securely in a .env file
-
-// App.use(cors({
-//   origin: 'http://localhost:3000',  // React frontend URL
-// }));
-
-// App.use(bp.json());
-// App.use(express.urlencoded({ extended: false }));
-
-// // API route for login
-// App.post("/api/login", async (req, res) => {
-//     const { EmailId, Password } = req.body;
-
-//     // Check if the user exists in the database
-//     const LoginCollection = myDb.collection("Login");
-//     const user = await LoginCollection.findOne({ EmailId });
-
-//     if (!user) {
-//         return res.status(400).send({ message: "Invalid email or password" });
-//     }
-
-//     // Compare the entered password with the hashed password in the database
-//     const isPasswordCorrect = await bcrypt.compare(Password, user.Password);
-
-//     if (!isPasswordCorrect) {
-//         return res.status(400).send({ message: "Invalid email or password" });
-//     }
-
-//     // Generate the JWT token
-//     const token = jwt.sign({EmailId: user.EmailId,User:user.Password }, JWT_SECRET, { expiresIn: '1h' });
-
-//     // Send the JWT token back to the client
-//     res.json({auth: token });
-// });
-
-// Start the server
-
+  App.post("/api/register", async (req, resp) => {
+    const { EmailId, Password, ConfirmPassword } = req.body; // Extract values from req.body
+  
+    // Check if password and confirm password match
+    if (ConfirmPassword === Password) {
+      const LoginCollection = myDb.collection("login");
+  
+      // Check if the email already exists
+      const result = await LoginCollection.find({ EmailId: EmailId }).toArray();
+  
+      if (result.length === 0) {
+        // Insert new user if email doesn't exist
+        await LoginCollection.insertOne({ EmailId: EmailId, Password: Password });
+        return resp.send({ message: 1 }); // Send success response and return to stop further execution
+      } else {
+        // Email already exists
+        return resp.send({ message: -1 }); // Optional: Different code for "Email already registered"
+      }
+    }
+  
+    // If passwords do not match, send an error response
+    resp.send({ message: 0 });
+  });
+  
 
 App.listen(PORT, (err) => {
     if (err) console.log(err);
