@@ -7,6 +7,7 @@ import Documents from './Components/Documents';
 import Images from './Components/Images';
 import Videos from './Components/Videos';
 import Others from './Components/Others';
+import OTP from './Components/OTP';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="/images" element={<Images />} />
           <Route path="/others" element={<Others />} />
           <Route path="/videos" element={<Videos />} />
+          <Route path="/otp" element={<OTP />} />
 
         </Routes>
       </div>

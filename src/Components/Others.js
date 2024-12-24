@@ -99,7 +99,7 @@ function Others() {
 
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
-      {sessionStorage.getItem("loginId") ? (
+      {localStorage.getItem("loginId") ? (
         <div>
           {/* Header section */}
           <div className="flex flex-row items-center gap-16 mt-[50px] w-full">

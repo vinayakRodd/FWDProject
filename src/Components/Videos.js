@@ -1,3 +1,4 @@
+import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import React, { useEffect, useState } from 'react';
 
@@ -31,18 +32,18 @@ function Videos() {
     });
   };
 
-  const handleFileUpload = (event) => {
-    const files = Array.from(event.target.files).filter(file => file.type.startsWith("video/"));
-    const fileUrls = files.map((file) => ({
-      name: file.name,
-      url: URL.createObjectURL(file),
-      size: file.size,
-      type: file.type,
-    }));
+  // const handleFileUpload = (event) => {
+  //   const files = Array.from(event.target.files).filter(file => file.type.startsWith("video/"));
+  //   const fileUrls = files.map((file) => ({
+  //     name: file.name,
+  //     url: URL.createObjectURL(file),
+  //     size: file.size,
+  //     type: file.type,
+  //   }));
 
-    setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
-    updateStorageInfo([...uploadedFiles, ...fileUrls]);
-  };
+  //   setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
+  //   updateStorageInfo([...uploadedFiles, ...fileUrls]);
+  // };
 
   useEffect(() => {
     updateStorageInfo(uploadedFiles);
@@ -90,9 +91,48 @@ function Videos() {
     window.location.href = '/'
   }
 
+  const [totalImageStorage, setTotalImageStorage] = useState(0); // in GB
+  
+  
+  const fetchDocuments = async () => {
+    try {
+      const response = await axios.get("http://localhost:9000/api/videos");
+  
+      console.log(response.data); // Debugging step to inspect the response
+  
+      // Filter only .pdf files from the response data
+      const pdfFiles = response.data.filter((file) => {
+        const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+        return fileExtension === '.mp4' || fileExtension === '.mp3';  // Check if the extension is .jpg or .png
+      });  
+      
+
+      // Set the filtered files to uploadedFiles
+      setUploadedFiles(pdfFiles);
+  
+      // Calculate total size of the .pdf files
+      const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
+      setTotalImageStorage(totalSize / (1024 * 1024 * 1024)); // Convert to GB
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    }
+  };
+  
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  useEffect(() => {
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const urls = uploadedFiles.map(file => ({ url: file.url }));
+      setUploadedFiles(urls);
+    }
+  }, []);
+  
+
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
-      {sessionStorage.getItem("loginId") ? (
+      {localStorage.getItem("loginId") ? (
         <div>
           {/* Header section */}
           <div className="flex flex-row items-center gap-16 mt-[50px] w-full">
@@ -121,7 +161,7 @@ function Videos() {
     <input
       type="file"
       id="fileUpload"
-      onChange={handleFileUpload}
+      
       multiple
       style={{ display: 'none' }}
     />
@@ -202,8 +242,8 @@ function Videos() {
               <h1 className='text-5xl font-bold ml-[50px] mt-[40px]'>Videos</h1>
 
               <div className='flex flex-row w-[1070px] overflow-y-scroll h-[700px] mt-[20px] ml-[50px] flex-wrap gap-5'>
-                {videoFiles.length > 0 ? (
-                  videoFiles.map((file, index) => (
+                {uploadedFiles.length > 0 ? (
+                  uploadedFiles.map((file, index) => (
                     <div
                       key={index}
                       className='flex flex-col gap-3 w-[240px] h-[180px] bg-white rounded-3xl p-4 shadow-md relative'

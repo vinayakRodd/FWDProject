@@ -1,3 +1,4 @@
+import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import React, { useEffect, useState } from 'react';
 
@@ -31,21 +32,21 @@ function Documents() {
     window.location.href = '/'
   }
 
-  const totalStorageGB = 512;
+  // const totalStorageGB = 512;
 
-  const getStorageUsed = (files) => files.reduce((total, file) => total + file.size, 0);
+  // const getStorageUsed = (files) => files.reduce((total, file) => total + file.size, 0);
 
-  const updateStorageInfo = (files) => {
-    const usedStorageBytes = getStorageUsed(files);
-    const usedStorageGB = usedStorageBytes / (1024 * 1024 * 1024); // Convert bytes to GB
-    const usedPercentage = (usedStorageGB / totalStorageGB) * 100;
+  // const updateStorageInfo = (files) => {
+  //   const usedStorageBytes = getStorageUsed(files);
+  //   const usedStorageGB = usedStorageBytes / (1024 * 1024 * 1024); // Convert bytes to GB
+  //   const usedPercentage = (usedStorageGB / totalStorageGB) * 100;
   
-    setStorageInfo({
-      usedPercentage: usedPercentage.toFixed(2),
-      usedStorage: `${usedStorageGB.toFixed(2)}GB`, // Corrected here
-      totalStorage: `${totalStorageGB}GB`, // Corrected here
-    });
-  };
+  //   setStorageInfo({
+  //     usedPercentage: usedPercentage.toFixed(2),
+  //     usedStorage: `${usedStorageGB.toFixed(2)}GB`, // Corrected here
+  //     totalStorage: `${totalStorageGB}GB`, // Corrected here
+  //   });
+  // };
 
 
   const categorizeAndStoreFile = (file) => {
@@ -78,15 +79,15 @@ function Documents() {
       size: file.size,
       type: file.type,
     }));
-
+  
     setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
     fileUrls.forEach(categorizeAndStoreFile);
-    updateStorageInfo([...uploadedFiles, ...fileUrls]);
   };
+  
 
-  useEffect(() => {
-    updateStorageInfo(uploadedFiles);
-  }, [uploadedFiles]);
+  // useEffect(() => {
+  //   updateStorageInfo(uploadedFiles);
+  // }, [uploadedFiles]);
 
   const handleDeleteFile = (index) => {
     // Delete the file from uploadedFiles state
@@ -125,13 +126,19 @@ function Documents() {
   };
   
   const handleOpenFile = (file) => {
-    // If it's an image or a video, we will open it in a new tab
-   
-    // If it's a PDF or document, we will also open it in a new tab
-    if (file.type.startsWith("application/pdf") || file.type.startsWith("text/")) {
-      window.open(file.url, "_blank");
+    if (file.url) {
+      // Check if the file has a .pdf.pdf extension
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      if (fileExtension === 'pdf') {
+        window.open(file.url, "_blank");
+      } else {
+        console.error("Invalid file extension:", file);
+      }
+    } else {
+      console.error("Invalid file URL:", file);
     }
   };
+  
 
   const fileTypeImages = {
     pdf: '/images/DocLogo.svg',
@@ -141,14 +148,19 @@ function Documents() {
   };
 
   const getFileTypeImage = (file) => {
+    if (!file || !file.name) return fileTypeImages.other; // Ensure file.name exists
     const extension = file.name.split('.').pop().toLowerCase();
+  
     if (extension === 'pdf') return fileTypeImages.pdf;
     if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) return fileTypeImages.image;
     if (['mp4', 'avi', 'mov'].includes(extension)) return fileTypeImages.video;
     return fileTypeImages.other;
   };
+  
+  
 
-  const documentFiles = uploadedFiles.filter(file => file.type.startsWith('application/pdf') || file.type.startsWith('text/'));
+
+
 
 
   const GoToDashboard = () =>{
@@ -170,11 +182,41 @@ function Documents() {
     window.location.href = '/documents'
   }
 
+  const fetchDocuments = async () => {
+    try {
+      const response = await axios.get("http://localhost:9000/api/documents");
+  
+      console.log(response.data); // Debugging step to inspect the response
+  
+      // Filter only .pdf files from the response data
+      const pdfFiles = response.data.filter((file) => file.name.toLowerCase().endsWith('.pdf'));
+  
+      // Set the filtered files to uploadedFiles
+      setUploadedFiles(pdfFiles);
+  
+      // Calculate total size of the .pdf files
+      const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
+      setTotalDocumentStorage(totalSize / (1024 * 1024 * 1024)); // Convert to GB
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    }
+  };
+  
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  useEffect(() => {
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const urls = uploadedFiles.map(file => ({ url: file.url }));
+      setUploadedFiles(urls);
+    }
+  }, []);
   
 
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
-      {sessionStorage.getItem("loginId") ? (
+      {localStorage.getItem("loginId") ? (
         <div>
           {/* Header section */}
           <div className="flex flex-row items-center gap-16 mt-[50px] w-full">
@@ -287,49 +329,49 @@ function Documents() {
               </p>
 
               <div className='flex flex-row w-[1070px] overflow-y-scroll h-[700px] mt-[20px] ml-[50px] flex-wrap gap-5'>
-                {documentFiles.length > 0 ? (
-                  documentFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className='flex flex-col gap-3 w-[240px] h-[180px] bg-white rounded-3xl p-4 shadow-md relative'
-                    >
-                    <div className='flex flex-row gap-3'>
-                      <img  onClick={() => handleOpenFile(file)}  src={getFileTypeImage(file)} alt="file type" className="w-20 cursor-pointer h-20" />
-                      <div className="relative inline-block mt-4 w-[150px] h-[50px]">
-                        <div  onClick={() => handleMenuToggle(index)} className="relative"> {/* Make sure the parent container has relative positioning */}
-                                    <div
-                                        className="absolute top-2 right-2 flex flex-col cursor-pointer"
-                                         // Pass index to toggle the specific menu
-                                                >
-                                    <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
-                                    <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
-                                    <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
-                                  </div>
-                              </div>
-              
-                          {/* Menu (Delete option) */}
-                          {visibleMenuIndex === index && (
-                        <div className="absolute top-0 right-0 mt-8 w-[120px] bg-white shadow-md rounded-lg py-2 text-center">
-                        <button
-                        className="w-full text-red-500 hover:bg-gray-200 py-2 px-4 rounded-lg"
-                        onClick={() => handleDeleteFile(index)} // Delete file on click
-                        >
-                            Delete
-                        </button>
-                        </div>
-                            )}
-
-                        </div>
-                    </div>
-                      <p className="text-lg font-semibold truncate w-full" title={file.name}>{file.name}</p>
-                      <p className="text-sm text-gray-500">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-                      
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xl ml-4 text-gray-500">No documents uploaded yet.</p>
-                )}
+  {uploadedFiles.length > 0 ? (
+    uploadedFiles.map((file, index) => (
+      <div
+        key={index}
+        className='flex flex-col gap-3 w-[240px] h-[180px] bg-white rounded-3xl p-4 shadow-md relative'
+      >
+        <div className='flex flex-row gap-3'>
+          <img 
+            onClick={() => handleOpenFile(file)} 
+            src={getFileTypeImage(file)} 
+            alt="file type" 
+            className="w-20 cursor-pointer h-20" 
+          />
+          <div className="relative inline-block mt-4 w-[150px] h-[50px]">
+            <div onClick={() => handleMenuToggle(index)} className="relative">
+              <div className="absolute top-2 right-2 flex flex-col cursor-pointer">
+                <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
+                <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
+                <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
               </div>
+            </div>
+
+            {/* Menu (Delete option) */}
+            {visibleMenuIndex === index && (
+              <div className="absolute top-0 right-0 mt-8 w-[120px] bg-white shadow-md rounded-lg py-2 text-center">
+                <button
+                  className="w-full text-red-500 hover:bg-gray-200 py-2 px-4 rounded-lg"
+                  onClick={() => handleDeleteFile(index)} // Delete file on click
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <p className="text-lg font-semibold truncate w-full" title={file.name}>{file.name}</p>
+      </div>
+    ))
+  ) : (
+    <p className="text-xl ml-4 text-gray-500">No documents uploaded yet.</p>
+  )}
+</div>
+
             </div>
           </div>
         </div>
@@ -341,3 +383,7 @@ function Documents() {
 }
 
 export default Documents
+
+
+
+

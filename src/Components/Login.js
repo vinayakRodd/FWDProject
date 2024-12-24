@@ -1,10 +1,10 @@
 import axios from 'axios'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 // import { useNavigate } from 'react-router-dom';
 function Login() {
 
     
-    const getConfirmPassword = useRef('')
+    const getConfirmPassword = useRef("")
 
  const [CreateAccount,setCreateAccount] = useState(0)
 const[LoginStatus,setLoginStatus] = useState(0)
@@ -21,7 +21,7 @@ const authenticate = () =>{
     .then(response=>{
         if(response.data[0].EmailId == EmailId.current.value && response.data[0].Password == Password.current.value){
             
-            // localStorage.setItem("authToken", response.data.token);
+            
             setLoginStatus(1)
             sessionStorage.setItem("loginId","true")
             setTimeout(()=>{
@@ -29,8 +29,11 @@ const authenticate = () =>{
                 
             },1000)
 
+
+
             setTimeout(()=>{
 
+            
                 window.location.href = '/dashboard';
 
             },1000)
@@ -72,20 +75,26 @@ const RegisterUser = ()=>{
     axios.post("http://localhost:9000/api/register",myData)
     .then(response=>{
 
-        if(response.data.message && response.data[0].EmailId === EmailId.current.value
-            && response.data[0].Password === Password.current.value
-        ){
+        if(response.data.message === 2 && response.data.otp){
 
+            localStorage.setItem("EmailId",EmailId.current.value)
+            localStorage.setItem("Password",Password.current.value)
+            
+        
             setRegisterStatus(1)
             setTimeout(()=>{
 
                 setRegisterStatus(0)
+                window.location.href = '/otp'
 
             },1000)
             
         }
         else
+        if(response.data.message === -1)
             alert("User Already Exists")
+        else
+            alert("Invalid Credentails")
             
     })
 }
@@ -109,7 +118,7 @@ const RegisterUser = ()=>{
        {RegisterStatus ?
          <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
          <div className="shadow-custom-blue w-[300px] rounded-3xl bg-[#FA7275] h-[60px] flex items-center justify-center">
-           <h1 className="text-white text-2xl text-center">User Registered</h1>
+           <h1 className="text-white text-2xl text-center">OTP Sent to Your Mail</h1>
          </div>
        </div>:null}
 
@@ -134,6 +143,7 @@ const RegisterUser = ()=>{
         <div>
 
                 <div className='h-[628px] w-[580px] flex  flex-col mt-[250px] gap-10  ml-[150px]' >
+                
                     {CreateAccount ? 
                    <h1 className='text-5xl font-bold text-left' >Create Account</h1>:
                    <h1 className='text-5xl font-bold text-left' >Login</h1>
@@ -190,78 +200,3 @@ const RegisterUser = ()=>{
 }
 
 export default Login
-
-// import axios from 'axios';
-// import React, { useState, useRef } from 'react';
-// import { useNavigate } from 'react-router-dom';
-
-// function Login() {
-//   const [CreateAccount, setCreateAccount] = useState(0);
-//   const [LoginStatus, setLoginStatus] = useState(0);
-//   const [ErrorLogin, setErrorLogin] = useState(0);
-
-//   const EmailId = useRef('');
-//   const Password = useRef('');
-//   const navigate = useNavigate();  // For navigation
-
-//   const authenticate = () => {
-//     const myData = { EmailId: EmailId.current.value, Password: Password.current.value };
-
-//     axios
-//       .post("http://localhost:9000/api/login", myData)
-//       .then(response => {
-//         // Store the JWT token in localStorage
-//         localStorage.setItem("authToken", response.data.token);
-        
-//         // Show success message
-//         setLoginStatus(1);
-//         setTimeout(() => {
-//           setLoginStatus(0);
-//         }, 1000);
-
-//         // Redirect to the dashboard
-//         setTimeout(() => {
-//           navigate("/dashboard");
-//         }, 1000);
-//       })
-//       .catch(err => {
-//         console.log(err);
-//         setErrorLogin(1);
-//         setTimeout(() => {
-//           setErrorLogin(0);
-//         }, 1000);
-//       });
-//   };
-
-//   return (
-//     <div className="flex z-50 flex-row">
-//       {LoginStatus && (
-//         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
-//           <div className="shadow-custom-blue w-[300px] rounded-3xl bg-[#FA7275] h-[60px] flex items-center justify-center">
-//             <h1 className="text-white text-2xl text-center">Login Successful</h1>
-//           </div>
-//         </div>
-//       )}
-
-//       {ErrorLogin && (
-//         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
-//           <div className="shadow-custom-blue w-[400px] rounded-3xl bg-[#FA7275] h-[60px] flex items-center justify-center">
-//             <h1 className="text-white text-2xl text-center">Incorrect Email Id or Password</h1>
-//           </div>
-//         </div>
-//       )}
-
-//       {/* Login Form */}
-//       <div className="bg-[#FA7275] h-[1024px] w-[580px]">
-//         {/* Your form content */}
-//         <div className="h-[628px] w-[580px] flex flex-col mt-[250px] gap-10 ml-[150px]">
-//           <button onClick={authenticate} className="bg-[#FA7275] h-[60px] cursor-pointer w-[600px] font-medium mt-30px shadow-custom-blue rounded-full text-white">
-//             Login
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default Login;

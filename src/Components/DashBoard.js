@@ -3,6 +3,7 @@
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import React, { useEffect, useState } from 'react';
 import CircularStorageDisplay from './CircularStorageDisplay';
+import axios from 'axios';
 
 
 function DashBoard() {
@@ -68,25 +69,173 @@ function DashBoard() {
     }));
   };
 
-  const handleFileUpload = (event) => {
+
+  const [loading,setLoading] = useState(true)
+
+  const fetchFiles = async () => {
+    try {
+      const response = await axios.get('http://localhost:9000/api/fetchFiles');
+      
+      // Debugging step to inspect the response
+      console.log('Fetched files:', response.data);
+  
+      const fileUrls = response.data?.length
+  ? response.data
+      .reduce((uniqueFiles, file) => {
+        // Check if the file URL is already added in the uniqueFiles array
+        if (!uniqueFiles.some((uniqueFile) => uniqueFile.url === file.secure_url)) {
+          // Get the file URL
+          let fileUrl = file.secure_url;
+
+          // Only add '.pdf' if the file URL ends with '.pdf'
+          if (fileUrl.endsWith('.pdf') && !fileUrl.endsWith('.pdf.pdf')) {
+            fileUrl += '.pdf';  // Add .pdf to the URL
+          }
+
+          uniqueFiles.push({
+            url: fileUrl,  // Use the modified URL with the .pdf extension
+            name: file.display_name || file.secure_url.split('/').pop(),  // Use display name or fallback to URL basename
+          });
+        }
+        return uniqueFiles;
+      }, [])
+  : [];
+
+    
+    
+
+      console.log("FileUrls")
+  
+      console.log(fileUrls)
+      setUploadedFiles(fileUrls); // Update state with sanitized files
+    } catch (error) {
+      console.error('Error fetching files:', error);
+      setUploadedFiles([]); // Reset files in case of an error
+    } finally {
+      setLoading(false); // Stop loading after fetching
+    }
+  };
+  
+  useEffect(() => {
+    fetchFiles(); // Call the fetchFiles function after the component mounts
+    alert("Loading files..")
+  }, []); // Empty
+
+  const [isUploading, setIsUploading] = useState(false);
+  const handleFileUpload = async (event) => {
+    event.preventDefault();
+  
+    if (isUploading) {
+      console.log("Upload already in progress.");
+      return;
+    }
+  
+    setIsUploading(true);
+    console.log("Upload started.");
+  
     const files = Array.from(event.target.files);
-    const fileUrls = files.map((file) => ({
+    if (files.length === 0) {
+      console.log("No files selected.");
+      setIsUploading(false);
+      return;
+    }
+
+    setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
+
+  
+    // Normalize the file names to handle small variations
+    const normalizeFileName = (filename) => {
+      return filename.trim().toLowerCase().replace(/\s+/g, '_');
+    };
+  
+    // Filter out duplicate files based on name and size
+    const uniqueFiles = [];
+    files.forEach((file) => {
+      const normalizedFileName = normalizeFileName(file.name);
+      const isDuplicate = uploadedFiles.some(uploadedFile => 
+        normalizeFileName(uploadedFile.name) === normalizedFileName && uploadedFile.size === file.size
+      );
+  
+      if (!isDuplicate) {
+        uniqueFiles.push(file);
+      } else {
+        console.log(`Skipping duplicate file: ${file.name}`);
+      }
+    });
+  
+    // Log files for debugging
+    console.log("Files after filtering duplicates:", uniqueFiles);
+  
+    if (uniqueFiles.length === 0) {
+      console.log("No unique files to upload.");
+      setIsUploading(false);
+      return;
+    }
+  
+    // Map files to the file URLs
+    const fileUrls = uniqueFiles.map((file) => ({
       name: file.name,
       url: URL.createObjectURL(file),
       size: file.size,
       type: file.type,
     }));
+  
 
-    setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
-
+    // Add these unique files to the uploaded files state
+    setUploadedFiles((prevFiles) => [...prevFiles, ...fileUrls]);
+  
+    // Categorize and store files locally
     fileUrls.forEach(categorizeAndStoreFile);
-
-    updateStorageInfo([...uploadedFiles, ...fileUrls]);
+  
+    const formData = new FormData();
+    uniqueFiles.forEach((file) => {
+      formData.append('files', file);
+    });
+  
+    try {
+      console.log("Sending files to the backend...");
+      const response = await axios.post('http://localhost:9000/api/fileUpload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      console.log('Files uploaded successfully', response.data);
+    } catch (error) {
+      console.error('Error uploading files:', error);
+    } finally {
+      setIsUploading(false);
+      console.log("Upload complete.");
+    }
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [previousFiles, setPreviousFiles] = useState(uploadedFiles);
+
   useEffect(() => {
-    updateStorageInfo(uploadedFiles);
+    if (searchQuery === '') {
+      setPreviousFiles(uploadedFiles); // Store the current files if the search is cleared
+    }
+
   }, [uploadedFiles]);
+
+// Handle the search query change
+const handleSearchChange = (event) => {
+  const query = event.target.value.toLowerCase();
+  setSearchQuery(query);
+  
+
+  const filteredFiles = searchQuery
+  ? uploadedFiles.filter(file =>
+      file.name.toLowerCase().includes(searchQuery)
+    )
+  : previousFiles;
+
+setUploadedFiles(filteredFiles)
+
+};
+
+
+  
+
 
   const [visibleMenuIndex, setVisibleMenuIndex] = useState(null);
 
@@ -94,27 +243,50 @@ function DashBoard() {
     setVisibleMenuIndex(visibleMenuIndex === index ? null : index);
   };
 
-  const handleDeleteFile = (index) => {
+
+
+  const handleDeleteFile = async (index) => {
     const fileToDelete = uploadedFiles[index];
     const newFiles = uploadedFiles.filter((_, i) => i !== index);
 
-    // Update storage by type to reduce the file size of the deleted file
-    const typeKey = categorizeFileType(fileToDelete);
-    setStorageByType((prev) => ({
-      ...prev,
-      [typeKey]: {
-        size: prev[typeKey].size - fileToDelete.size / (1024 * 1024 * 1024), // Subtract GB
-        lastUpdate: new Date().toLocaleDateString(),
-      },
-    }));
+    // First, we need to delete the file from Cloudinary
+    try {
+        const fileName = fileToDelete.name; // Assuming file.name contains the file name or id
+        const response = await axios.post('http://localhost:9000/api/deleteFile', {
+            data: { fileName }, // Send the fileName to the backend
+        });
 
-    // Update total storage
-    updateStorageInfo(newFiles);
+        if (response.data.success) {
+            console.log('File deleted successfully from Cloudinary:', response.data);
 
-    setUploadedFiles(newFiles); // Update the state by removing the file
-    setVisibleMenuIndex(null); // Close the delete menu after deletion
-  };
+            // After successful deletion from Cloudinary, update the storage state
+            const typeKey = categorizeFileType(fileToDelete);
+            setStorageByType((prev) => ({
+                ...prev,
+                [typeKey]: {
+                    size: prev[typeKey].size - fileToDelete.size / (1024 * 1024 * 1024), // Subtract GB
+                    lastUpdate: new Date().toLocaleDateString(),
+                },
+            }));
 
+            // Update total storage info
+
+            updateStorageInfo(newFiles);
+
+            setUploadedFiles(newFiles); // Update the state by removing the file
+            setVisibleMenuIndex(null); // Close the delete menu after deletion
+        } else {
+            console.error('File deletion failed:', response.data);
+            alert('File not deleted. Please try again later.'); // Inform user about failure
+        }
+
+    } catch (error) {
+        console.error('Error deleting file from Cloudinary:', error);
+        alert('Error occurred while deleting the file. Please try again later.'); // Show error message to user
+    }
+};
+
+  
   const categorizeFileType = (file) => {
     const fileType = file.type;
     if (fileType.startsWith("image/")) {
@@ -168,11 +340,13 @@ function DashBoard() {
     sessionStorage.setItem("loginId","false")
     window.location.href = '/'
   }
+
+  
   
 
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
-      {sessionStorage.getItem("loginId") ? (
+      {localStorage.getItem("loginId") ? (
         <div>
           <div className="flex flex-row items-center gap-16 mt-[50px] w-full">
             <div className="flex flex-row gap-3 items-center">
@@ -184,11 +358,13 @@ function DashBoard() {
               <input
                 placeholder="Search"
                 className="w-full text-left border-none rounded focus:outline-none focus:ring-0"
+                value={searchQuery} // Set the search query as the value
+                onChange={handleSearchChange}
               />
             </div>
 
             <div className='flex flex-row gap-4 ml-auto pr-[40px]'>
-  {/* Upload Button */}
+
   <div onClick={() => document.getElementById('fileUpload').click()} className="relative inline-block">
     <i
       style={{ fontSize: '30px' }}
@@ -202,6 +378,7 @@ function DashBoard() {
     <input
       type="file"
       id="fileUpload"
+
       onChange={handleFileUpload}
       multiple
       style={{ display: 'none' }}
@@ -383,16 +560,17 @@ function DashBoard() {
                           width={70}
                           alt="File Logo"
                         />
+
+
                         <a
                           href={file.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 mt-6 w-[170px] overflow-hidden text-ellipsis whitespace-nowrap hover:text-blue-700"
+                          target='_blank'
+                          className="text-blue-500 cursor-pointer mt-6 w-[170px] overflow-hidden text-ellipsis whitespace-nowrap hover:text-blue-700"
                           title={file.name} // Tooltip to show full file name on hover
                         >
                           {file.name}
                         </a>
-              
+
                         {/* Three Dots Menu */}
                         <div className="relative inline-block mt-4 w-[150px] h-[50px]">
                         <div className="relative"> {/* Make sure the parent container has relative positioning */}
@@ -439,3 +617,5 @@ function DashBoard() {
 }
 
 export default DashBoard;
+
+
