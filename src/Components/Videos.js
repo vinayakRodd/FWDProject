@@ -107,6 +107,7 @@ function Videos() {
       });  
       
 
+      console.log(pdfFiles)
       // Set the filtered files to uploadedFiles
       setUploadedFiles(pdfFiles);
   

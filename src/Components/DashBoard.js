@@ -74,40 +74,25 @@ function DashBoard() {
 
   const fetchFiles = async () => {
     try {
+      // Fetch the file data from the backend
       const response = await axios.get('http://localhost:9000/api/fetchFiles');
       
       // Debugging step to inspect the response
       console.log('Fetched files:', response.data);
   
-      const fileUrls = response.data?.length
-  ? response.data
-      .reduce((uniqueFiles, file) => {
-        // Check if the file URL is already added in the uniqueFiles array
-        if (!uniqueFiles.some((uniqueFile) => uniqueFile.url === file.secure_url)) {
-          // Get the file URL
-          let fileUrl = file.secure_url;
+      // Ensure the response contains files
+      const fileUrls = response.data?.files?.length
+        ? response.data.files.map((file) => ({
+            url: file.secure_url,        // Directly use the secure_url from the backend
+            public_id: file.public_id,   // Store the public_id for later operations like delete
+            name: file.display_name || file.secure_url.split('/').pop(),  // Use display_name if available
+        }))
+        : [];
 
-          // Only add '.pdf' if the file URL ends with '.pdf'
-          if (fileUrl.endsWith('.pdf') && !fileUrl.endsWith('.pdf.pdf')) {
-            fileUrl += '.pdf';  // Add .pdf to the URL
-          }
-
-          uniqueFiles.push({
-            url: fileUrl,  // Use the modified URL with the .pdf extension
-            name: file.display_name || file.secure_url.split('/').pop(),  // Use display name or fallback to URL basename
-          });
-        }
-        return uniqueFiles;
-      }, [])
-  : [];
-
-    
-    
-
-      console.log("FileUrls")
+      // Update state with the fetched file data
+      setUploadedFiles(fileUrls);
   
-      console.log(fileUrls)
-      setUploadedFiles(fileUrls); // Update state with sanitized files
+      console.log("Updated file URLs:", fileUrls);
     } catch (error) {
       console.error('Error fetching files:', error);
       setUploadedFiles([]); // Reset files in case of an error
@@ -115,6 +100,50 @@ function DashBoard() {
       setLoading(false); // Stop loading after fetching
     }
   };
+
+  // const fetchFiles = async () => {
+  //   try {
+  //     const response = await axios.get('http://localhost:9000/api/fetchFiles');
+      
+  //     // Debugging step to inspect the response
+  //     console.log('Fetched files:', response.data);
+  
+  //     const fileUrls = response.data?.length
+  // ? response.data
+  //     .reduce((uniqueFiles, file) => {
+  //       // Check if the file URL is already added in the uniqueFiles array
+  //       if (!uniqueFiles.some((uniqueFile) => uniqueFile.url === file.secure_url)) {
+  //         // Get the file URL
+  //         let fileUrl = file.secure_url;
+
+  //         // Only add '.pdf' if the file URL ends with '.pdf'
+  //         if (fileUrl.endsWith('.pdf') && !fileUrl.endsWith('.pdf.pdf')) {
+  //           fileUrl += '.pdf';  // Add .pdf to the URL
+  //         }
+
+  //         uniqueFiles.push({
+  //           url: fileUrl,  // Use the modified URL with the .pdf extension
+  //           name: file.display_name || file.secure_url.split('/').pop(),  // Use display name or fallback to URL basename
+  //         });
+  //       }
+  //       return uniqueFiles;
+  //     }, [])
+  // : [];
+
+    
+    
+
+  //     console.log("FileUrls")
+  
+  //     console.log(fileUrls)
+  //     setUploadedFiles(fileUrls); // Update state with sanitized files
+  //   } catch (error) {
+  //     console.error('Error fetching files:', error);
+  //     setUploadedFiles([]); // Reset files in case of an error
+  //   } finally {
+  //     setLoading(false); // Stop loading after fetching
+  //   }
+  // };
   
   useEffect(() => {
     fetchFiles(); // Call the fetchFiles function after the component mounts
@@ -122,6 +151,7 @@ function DashBoard() {
   }, []); // Empty
 
   const [isUploading, setIsUploading] = useState(false);
+
   const handleFileUpload = async (event) => {
     event.preventDefault();
   
@@ -139,9 +169,8 @@ function DashBoard() {
       setIsUploading(false);
       return;
     }
-
+  
     setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
-
   
     // Normalize the file names to handle small variations
     const normalizeFileName = (filename) => {
@@ -152,7 +181,7 @@ function DashBoard() {
     const uniqueFiles = [];
     files.forEach((file) => {
       const normalizedFileName = normalizeFileName(file.name);
-      const isDuplicate = uploadedFiles.some(uploadedFile => 
+      const isDuplicate = uploadedFiles.some(uploadedFile =>
         normalizeFileName(uploadedFile.name) === normalizedFileName && uploadedFile.size === file.size
       );
   
@@ -180,7 +209,6 @@ function DashBoard() {
       type: file.type,
     }));
   
-
     // Add these unique files to the uploaded files state
     setUploadedFiles((prevFiles) => [...prevFiles, ...fileUrls]);
   
@@ -198,6 +226,26 @@ function DashBoard() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       console.log('Files uploaded successfully', response.data);
+  
+      // Assuming response contains the file URLs and public_ids
+      if (response.data.success) {
+        const uploadedFileUrls = response.data.fileUrls; // Array of URLs from Cloudinary response
+        const uploadedPublicIds = response.data.public_ids; // Array of public_ids from Cloudinary response
+  
+        // Map the uploaded files with URLs, public_ids, and other details
+        const updatedFiles = uniqueFiles.map((file, index) => ({
+          name: file.name,
+          size: file.size,
+          url: uploadedFileUrls[index],  // URL from Cloudinary response
+          public_id: uploadedPublicIds[index],  // public_id from Cloudinary response
+          type: file.type,
+        }));
+  
+        // Add these updated files to the uploaded files state
+        setUploadedFiles((prevFiles) => [...prevFiles, ...updatedFiles]);
+      } else {
+        console.error('Error uploading files:', response.data);
+      }
     } catch (error) {
       console.error('Error uploading files:', error);
     } finally {
@@ -205,6 +253,91 @@ function DashBoard() {
       console.log("Upload complete.");
     }
   };
+  
+
+  // const handleFileUpload = async (event) => {
+  //   event.preventDefault();
+  
+  //   if (isUploading) {
+  //     console.log("Upload already in progress.");
+  //     return;
+  //   }
+  
+  //   setIsUploading(true);
+  //   console.log("Upload started.");
+  
+  //   const files = Array.from(event.target.files);
+  //   if (files.length === 0) {
+  //     console.log("No files selected.");
+  //     setIsUploading(false);
+  //     return;
+  //   }
+
+  //   setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
+
+  
+  //   // Normalize the file names to handle small variations
+  //   const normalizeFileName = (filename) => {
+  //     return filename.trim().toLowerCase().replace(/\s+/g, '_');
+  //   };
+  
+  //   // Filter out duplicate files based on name and size
+  //   const uniqueFiles = [];
+  //   files.forEach((file) => {
+  //     const normalizedFileName = normalizeFileName(file.name);
+  //     const isDuplicate = uploadedFiles.some(uploadedFile => 
+  //       normalizeFileName(uploadedFile.name) === normalizedFileName && uploadedFile.size === file.size
+  //     );
+  
+  //     if (!isDuplicate) {
+  //       uniqueFiles.push(file);
+  //     } else {
+  //       console.log(`Skipping duplicate file: ${file.name}`);
+  //     }
+  //   });
+  
+  //   // Log files for debugging
+  //   console.log("Files after filtering duplicates:", uniqueFiles);
+  
+  //   if (uniqueFiles.length === 0) {
+  //     console.log("No unique files to upload.");
+  //     setIsUploading(false);
+  //     return;
+  //   }
+  
+  //   // Map files to the file URLs
+  //   const fileUrls = uniqueFiles.map((file) => ({
+  //     name: file.name,
+  //     url: URL.createObjectURL(file),
+  //     size: file.size,
+  //     type: file.type,
+  //   }));
+  
+
+  //   // Add these unique files to the uploaded files state
+  //   setUploadedFiles((prevFiles) => [...prevFiles, ...fileUrls]);
+  
+  //   // Categorize and store files locally
+  //   fileUrls.forEach(categorizeAndStoreFile);
+  
+  //   const formData = new FormData();
+  //   uniqueFiles.forEach((file) => {
+  //     formData.append('files', file);
+  //   });
+
+  //   try {
+  //     console.log("Sending files to the backend...");
+  //     const response = await axios.post('http://localhost:9000/api/fileUpload', formData, {
+  //       headers: { 'Content-Type': 'multipart/form-data' },
+  //     });
+  //     console.log('Files uploaded successfully', response.data);
+  //   } catch (error) {
+  //     console.error('Error uploading files:', error);
+  //   } finally {
+  //     setIsUploading(false);
+  //     console.log("Upload complete.");
+  //   }
+  // };
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -244,47 +377,53 @@ setUploadedFiles(filteredFiles)
   };
 
 
-
   const handleDeleteFile = async (index) => {
     const fileToDelete = uploadedFiles[index];
     const newFiles = uploadedFiles.filter((_, i) => i !== index);
-
+  
     // First, we need to delete the file from Cloudinary
     try {
-        const fileName = fileToDelete.name; // Assuming file.name contains the file name or id
-        const response = await axios.post('http://localhost:9000/api/deleteFile', {
-            data: { fileName }, // Send the fileName to the backend
-        });
-
-        if (response.data.success) {
-            console.log('File deleted successfully from Cloudinary:', response.data);
-
-            // After successful deletion from Cloudinary, update the storage state
-            const typeKey = categorizeFileType(fileToDelete);
-            setStorageByType((prev) => ({
-                ...prev,
-                [typeKey]: {
-                    size: prev[typeKey].size - fileToDelete.size / (1024 * 1024 * 1024), // Subtract GB
-                    lastUpdate: new Date().toLocaleDateString(),
-                },
-            }));
-
-            // Update total storage info
-
-            updateStorageInfo(newFiles);
-
-            setUploadedFiles(newFiles); // Update the state by removing the file
-            setVisibleMenuIndex(null); // Close the delete menu after deletion
-        } else {
-            console.error('File deletion failed:', response.data);
-            alert('File not deleted. Please try again later.'); // Inform user about failure
+      const { public_id } = fileToDelete;  // Assume public_id is stored when the file is uploaded
+      alert(public_id);  // Debugging step to show public_id
+      
+      // Send the public_id to the backend for deletion
+      const response = await axios.post('http://localhost:9000/api/deleteFile', {
+        data: { public_id },  // Send public_id inside a "data" object
+      }, {
+        headers: {
+          'Content-Type': 'application/json',  // Ensure the header is set correctly
         }
-
+      });
+      
+      if (response.data.success) {
+        console.log('File deleted successfully from Cloudinary:', response.data);
+  
+        // After successful deletion from Cloudinary, update the storage state
+        const typeKey = categorizeFileType(fileToDelete);
+        setStorageByType((prev) => ({
+          ...prev,
+          [typeKey]: {
+            size: prev[typeKey].size - fileToDelete.size / (1024 * 1024 * 1024), // Subtract GB
+            lastUpdate: new Date().toLocaleDateString(),
+          },
+        }));
+  
+        // Update total storage info
+        updateStorageInfo(newFiles);
+  
+        setUploadedFiles(newFiles); // Update the state by removing the file
+        setVisibleMenuIndex(null); // Close the delete menu after deletion
+      } else {
+        console.error('File deletion failed:', response.data);
+        alert('File not deleted. Please try again later.'); // Inform user about failure
+      }
+  
     } catch (error) {
-        console.error('Error deleting file from Cloudinary:', error);
-        alert('Error occurred while deleting the file. Please try again later.'); // Show error message to user
+      console.error('Error deleting file from Cloudinary:', error);
+      alert('Error occurred while deleting the file. Please try again later.'); // Show error message to user
     }
-};
+  };
+  
 
   
   const categorizeFileType = (file) => {

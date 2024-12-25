@@ -114,6 +114,7 @@ App.get("/api/images", async (req, res) => {
         }
       );
   
+
       // Debugging the response
       console.log(response.data);
   
@@ -199,47 +200,89 @@ const storage = new CloudinaryStorage({
 });
 
 
-
 App.get('/api/fetchFiles', async (req, res) => {
-    try {
-      let allResources = [];
-      let nextCursor = null;
-  
-      do {
-        // Fetch resources with pagination
-        const result = await cloudinary.api.resources({
-          type: 'upload',
-          prefix: 'uploads/',
-          max_results: 100,
-          next_cursor: nextCursor,
-        });
-  
-        // Directly use the resources without altering the URLs unnecessarily
-        const sanitizedResources = result.resources.map(file => ({
-          public_id: file.public_id, // Use the public_id as-is
-          secure_url: file.secure_url, // Use the correct URL provided by Cloudinary
-          format: file.format, // Ensure the format is available
-          bytes: file.bytes, // Add file size info (optional)
-          created_at: file.created_at, // Add timestamp (optional)
-        }));
-  
-        // Add sanitized resources to the main array
-        allResources = allResources.concat(sanitizedResources);
-  
-        // Get the next cursor for pagination
-        nextCursor = result.next_cursor;
-      } while (nextCursor);
-  
-      if (allResources.length > 0) {
-        res.status(200).json(allResources);
-      } else {
-        res.status(200).json({ message: 'No resources found' });
-      }
-    } catch (error) {
-      console.error('Error fetching files:', error);
-      res.status(500).json({ message: 'Error fetching files', error });
+  try {
+    let allResources = [];
+    let nextCursor = null;
+
+    do {
+      // Fetch resources with pagination
+      const result = await cloudinary.api.resources({
+        type: 'upload',
+        prefix: 'uploads/',
+        max_results: 100,
+        next_cursor: nextCursor,
+      });
+
+      // Directly use the resources without altering the URLs unnecessarily
+      const sanitizedResources = result.resources.map(file => ({
+        public_id: file.public_id, // Use the public_id as-is
+        secure_url: file.secure_url, // Use the correct URL provided by Cloudinary
+        format: file.format, // Ensure the format is available
+        bytes: file.bytes, // Add file size info (optional)
+        created_at: file.created_at, // Add timestamp (optional)
+      }));
+
+      // Add sanitized resources to the main array
+      allResources = allResources.concat(sanitizedResources);
+
+      // Get the next cursor for pagination
+      nextCursor = result.next_cursor;
+    } while (nextCursor);
+
+    // If files are found, return them; otherwise, return a message
+    if (allResources.length > 0) {
+      res.status(200).json({ success: true, files: allResources });
+    } else {
+      res.status(200).json({ success: false, message: 'No resources found' });
     }
-  });
+  } catch (error) {
+    console.error('Error fetching files:', error);
+    res.status(500).json({ success: false, message: 'Error fetching files', error });
+  }
+});
+
+
+// App.get('/api/fetchFiles', async (req, res) => {
+//     try {
+//       let allResources = [];
+//       let nextCursor = null;
+  
+//       do {
+//         // Fetch resources with pagination
+//         const result = await cloudinary.api.resources({
+//           type: 'upload',
+//           prefix: 'uploads/',
+//           max_results: 100,
+//           next_cursor: nextCursor,
+//         });
+  
+//         // Directly use the resources without altering the URLs unnecessarily
+//         const sanitizedResources = result.resources.map(file => ({
+//           public_id: file.public_id, // Use the public_id as-is
+//           secure_url: file.secure_url, // Use the correct URL provided by Cloudinary
+//           format: file.format, // Ensure the format is available
+//           bytes: file.bytes, // Add file size info (optional)
+//           created_at: file.created_at, // Add timestamp (optional)
+//         }));
+  
+//         // Add sanitized resources to the main array
+//         allResources = allResources.concat(sanitizedResources);
+  
+//         // Get the next cursor for pagination
+//         nextCursor = result.next_cursor;
+//       } while (nextCursor);
+  
+//       if (allResources.length > 0) {
+//         res.status(200).json(allResources);
+//       } else {
+//         res.status(200).json({ message: 'No resources found' });
+//       }
+//     } catch (error) {
+//       console.error('Error fetching files:', error);
+//       res.status(500).json({ message: 'Error fetching files', error });
+//     }
+//   });
   
 
 
@@ -249,56 +292,79 @@ App.get('/api/fetchFiles', async (req, res) => {
 
 const upload = multer({ storage: storage });
 
-
 App.post('/api/fileUpload', upload.array('files'), async (req, res) => {
   console.log('Request received at:', new Date());
   console.log('Files received:', req.files); // Log received files
 
   try {
     const fileUrls = [];
-    const uploadedFiles = new Set(); // This will hold the unique combinations of name and size
+    const publicIds = [];  // This will store the public_ids of the uploaded files
+    const uploadedFiles = new Set(); // To hold unique combinations of name and size
 
     for (const file of req.files) {
-      // Create a unique key using the file name and size
-      const fileKey = `${file.originalname}_${file.size}`;
+      console.log(`Processing file: ${file.originalname}`);
 
-      console.log('Checking for duplicate:', fileKey); // Log the key being checked
-
-      // Check if file is a duplicate (based on name and size)
-      if (uploadedFiles.has(fileKey)) {
-        console.log(`Skipping duplicate file: ${file.originalname} (Key: ${fileKey})`);
-        continue; // Skip processing this file
+      // Determine the file's resource type based on MIME type
+      let resourceType = 'auto'; // Default type
+      if (file.mimetype.startsWith('video/')) {
+        resourceType = 'video';
+      } else if (file.mimetype.startsWith('image/')) {
+        resourceType = 'image';
+      } else if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed') {
+        resourceType = 'raw'; // Treat ZIP files as raw files
+      } else {
+        console.log(`Unsupported file type: ${file.mimetype}`);
+        return res.status(400).json({ message: `Unsupported file type: ${file.mimetype}` });
       }
 
-      // Add the file key to the set to mark it as uploaded
+      console.log(`Resource type for ${file.originalname}: ${resourceType}`);
+
+      // Check for duplicate based on name and size
+      const fileKey = `${file.originalname}_${file.size}`;
+      console.log('Checking for duplicate:', fileKey);
+
+      if (uploadedFiles.has(fileKey)) {
+        console.log(`Skipping duplicate file: ${file.originalname} (Key: ${fileKey})`);
+        continue; // Skip duplicate file
+      }
+
       uploadedFiles.add(fileKey);
       console.log(`File added to the set: ${file.originalname} (Key: ${fileKey})`);
 
-      console.log('Processing file:', file.originalname); // Log file being processed
-
-      // Define a clean public_id by removing problematic extensions and paths
+      // Define a clean public_id
       const cleanFileName = file.originalname.replace(/\.[^/.]+$/, ""); // Remove extension
       const uniquePublicId = `uploads/${cleanFileName}_${Date.now()}`; // Ensure unique name
 
-      const result = await cloudinary.uploader.upload(file.path, {
-        resource_type: 'auto',
-        folder: 'uploads/', // Optional, you can organize files into folders
-        public_id: uniquePublicId,
-        overwrite: true, // Ensure no duplicate files overwrite the same public_id
-      });
+      try {
+        const result = await cloudinary.uploader.upload(file.path, {
+          resource_type, // Use the determined resource type
+          folder: 'uploads/', // Optional: Organize files into a specific folder
+          public_id: uniquePublicId, // Use the unique public_id
+          overwrite: true, // Prevent overwriting of existing files with the same public_id
+        });
 
-      fileUrls.push(result.secure_url);
+        console.log(`Upload successful: ${result.secure_url}`);
+        fileUrls.push(result.secure_url);
+        publicIds.push(result.public_id);  // Save the public_id from Cloudinary
+      } catch (uploadError) {
+        console.error(`Failed to upload ${file.originalname}:`, uploadError);
+        return res.status(500).json({ message: `Error uploading ${file.originalname}`, error: uploadError });
+      }
     }
 
-    res.status(200).json({ success: true, fileUrls });
+    // If all files are processed successfully, return file URLs and public_ids
+    res.status(200).json({
+      success: true,
+      fileUrls,      // Array of file URLs from Cloudinary
+      public_ids: publicIds  // Array of public_ids from Cloudinary
+    });
   } catch (error) {
-    console.error('Error uploading files:', error);
-    res.status(500).json({ message: 'Error uploading files', error });
+    console.error('Error processing files:', error);
+    res.status(500).json({ message: 'Error processing files', error });
   }
 });
 
 
-// const upload = multer({ storage: storage });
 // App.post('/api/fileUpload', upload.array('files'), async (req, res) => {
 //   console.log('Request received at:', new Date());
 //   console.log('Files received:', req.files); // Log received files
@@ -308,95 +374,95 @@ App.post('/api/fileUpload', upload.array('files'), async (req, res) => {
 //     const uploadedFiles = new Set(); // This will hold the unique combinations of name and size
 
 //     for (const file of req.files) {
+//       console.log(`Processing file: ${file.originalname}`);
+
+//       // Determine the file's resource type based on MIME type
+//       let resourceType = 'auto'; // Default type
+//       if (file.mimetype.startsWith('video/')) {
+//         resourceType = 'video';
+//       } else if (file.mimetype.startsWith('image/')) {
+//         resourceType = 'image';
+//       } else if (file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed') {
+//         resourceType = 'raw'; // Treat ZIP files as raw files
+//       } else {
+//         console.log(`Unsupported file type: ${file.mimetype}`);
+//         res.status(400).json({ message: `Unsupported file type: ${file.mimetype}` });
+//         return; // Exit early for unsupported file types
+//       }
+
+//       console.log(`Resource type for ${file.originalname}: ${resourceType}`);
+
 //       // Create a unique key using the file name and size
 //       const fileKey = `${file.originalname}_${file.size}`;
-
-//       console.log('Checking for duplicate:', fileKey); // Log the key being checked
+//       console.log('Checking for duplicate:', fileKey);
 
 //       // Check if file is a duplicate (based on name and size)
 //       if (uploadedFiles.has(fileKey)) {
 //         console.log(`Skipping duplicate file: ${file.originalname} (Key: ${fileKey})`);
-//         continue; // Skip processing this file
+//         continue;
 //       }
 
 //       // Add the file key to the set to mark it as uploaded
 //       uploadedFiles.add(fileKey);
 //       console.log(`File added to the set: ${file.originalname} (Key: ${fileKey})`);
 
-//       console.log('Processing file:', file.originalname); // Log file being processed
-//       const result = await cloudinary.uploader.upload(file.path, {
-//         resource_type: 'auto',
-//         folder: 'uploads/',
-//       });
+//       // Define a clean public_id by removing problematic extensions and paths
+//       const cleanFileName = file.originalname.replace(/\.[^/.]+$/, ""); // Remove extension
+//       const uniquePublicId = `uploads/${cleanFileName}_${Date.now()}`; // Ensure unique name
 
-//       fileUrls.push(result.secure_url);
+//       try {
+//         const result = await cloudinary.uploader.upload(file.path, {
+//           resource_type, // Use the determined resource type
+//           folder: 'uploads/', // Optional, organize files into folders
+//           public_id: uniquePublicId,
+//           overwrite: true, // Ensure no duplicate files overwrite the same public_id
+//         });
+
+//         console.log(`Upload successful: ${result.secure_url}`);
+//         fileUrls.push(result.secure_url);
+//       } catch (uploadError) {
+//         console.error(`Failed to upload ${file.originalname}:`, uploadError);
+//         res.status(500).json({ message: `Error uploading ${file.originalname}`, error: uploadError });
+//         return; // Exit early if any file fails to upload
+//       }
 //     }
 
+//     // If all files are processed successfully
 //     res.status(200).json({ success: true, fileUrls });
 //   } catch (error) {
-//     console.error('Error uploading files:', error);
-//     res.status(500).json({ message: 'Error uploading files', error });
+//     console.error('Error processing files:', error);
+//     res.status(500).json({ message: 'Error processing files', error });
 //   }
 // });
 
 
 
-// const dbx = new Dropbox({ accessToken: 'sl.CDEEYI8uiwmxyFUb2IT-zL2S15dA36Qm2k97YLpjMq1RE7Izgjig_f_L6Ba2HJ4RsEa0F6-NPLlsGkk7CI37NpS2n2Uj6SXSQmkoP78anqtois0p2f2yrUTATsArn3dd9dTGE_qHA7zMnvznxrRm9S0', fetch: fetch });
+App.post('/api/deleteFile', async (req, res) => {
+  console.log("Request received:", req.body);
+
+  // Extract public_id from the 'data' object in the request body
+  const { public_id } = req.body.data;
+
+  if (!public_id) {
+      return res.status(400).json({ success: false, message: 'public_id is required' });
+  }
+
+  try {
+      const result = await cloudinary.uploader.destroy(public_id);
+      console.log("Cloudinary delete result:", result);
+
+      if (result.result === 'ok') {
+          return res.status(200).json({ success: true, message: 'File deleted successfully from Cloudinary' });
+      } else {
+          return res.status(400).json({ success: false, message: 'Failed to delete file from Cloudinary' });
+      }
+  } catch (error) {
+      console.error('Error deleting file from Cloudinary:', error);
+      return res.status(500).json({ success: false, message: 'Error occurred while deleting the file' });
+  }
+});
 
 
-
-// App.post('/api/fileUpload', multer().array('files'), async (req, res) => {
-//   try {
-//       const uploadedFiles = [];
-      
-//       for (const file of req.files) {
-//           const fileName = file.originalname;
-//           const fileBuffer = file.buffer;
-          
-//           // Specify the folder path you want to upload the file to
-//           const folderPath = '/drivelinkManagement (1)';  // Your Dropbox folder path
-
-//           // Upload the file to Dropbox
-//           const uploadResponse = await dbx.filesUpload({
-//               path: `${folderPath}/${fileName}`,  // Full path to the file in Dropbox
-//               contents: fileBuffer,
-//           });
-
-//           // Once uploaded, get a temporary shared link
-//           const linkResponse = await dbx.filesGetTemporaryLink({
-//               path: uploadResponse.result.path_display,
-//           });
-
-//           // Collect the temporary shared URLs of uploaded files
-//           const fileUrl = linkResponse.result.link;  // This is a shareable link
-//           uploadedFiles.push(fileUrl);
-//       }
-
-//       res.status(200).json({ success: true, fileUrls: uploadedFiles });
-//   } catch (error) {
-//       console.error('Error uploading files:', error);
-//       res.status(500).json({ message: 'Error uploading files', error: error.message });
-//   }
-// });
-
-
-// // Route to fetch all files (images, documents, etc.) from Dropbox
-// App.get('/api/fetchFiles', async (req, res) => {
-//   try {
-//       const response = await dbx.filesListFolder({ path: '/uploads' });
-//       const allFiles = response.result.entries.map((file) => ({
-//           name: file.name,
-//           size: file.size,
-//           url: `https://www.dropbox.com/s/${file.id}?dl=0`, // Create a shareable link for the file
-//           type: file['.tag'],
-//       }));
-
-//       res.status(200).json(allFiles);
-//   } catch (error) {
-//       console.error('Error fetching files from Dropbox:', error);
-//       res.status(500).json({ error: 'Failed to fetch files from Dropbox' });
-//   }
-// });
 
 
 const transporter = nodemailer.createTransport({
