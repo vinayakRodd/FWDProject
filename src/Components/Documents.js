@@ -200,7 +200,7 @@ function Documents() {
           url: file.secure_url,        // Use the secure_url from the backend
           public_id: file.public_id,  // Store the public_id for later operations like delete
           name: file.display_name || file.secure_url.split('/').pop(),
-          size: file.size ? file.size : 0, // Default to 0 if size is missing
+          size: file.bytes ? file.bytes : 0, // Default to 0 if size is missing
           type: file.type,
       }))
       : [];
@@ -261,13 +261,15 @@ function Documents() {
   
   };
 
-  const [totalUsedSpace, setTotalUsedSpace] = useState(0);
+
+const [totalUsedSpace, setTotalUsedSpace] = useState(0);
 
 // Calculate total space whenever uploadedFiles changes
 useEffect(() => {
-  const totalSize = uploadedFiles.reduce((acc, file) => acc + file.size, 0); // Sum file sizes
+  const totalSize = uploadedFiles.reduce((acc, file) => acc + (file.size || 0), 0); // Use 0 if size is undefined
   setTotalUsedSpace(totalSize / (1024 * 1024)); // Convert to MB
 }, [uploadedFiles]);
+
 
   return (
     <div className='flex flex-col h-[1000px] gap-5'>

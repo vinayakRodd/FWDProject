@@ -214,12 +214,13 @@ App.get('/api/fetchFiles', async (req, res) => {
         next_cursor: nextCursor,
       });
 
+
       // Directly use the resources without altering the URLs unnecessarily
       const sanitizedResources = result.resources.map(file => ({
         public_id: file.public_id, // Use the public_id as-is
         secure_url: file.secure_url, // Use the correct URL provided by Cloudinary
         format: file.format, // Ensure the format is available
-        size: file.bytes, // Add file size info (optional)
+        bytes: file.bytes, // Add file size info (optional)
         created_at: file.created_at, // Add timestamp (optional)
       }));
 
@@ -365,6 +366,10 @@ App.post('/api/fileUpload', upload.array('files'), async (req, res) => {
     res.status(500).json({ message: 'Error processing files', error });
   }
 });
+
+
+
+
 
 
 

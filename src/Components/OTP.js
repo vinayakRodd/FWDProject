@@ -21,7 +21,7 @@ const authenticateOTP = () =>{
         if((response.data[0].otp) == getOTP.current.value){
             
             alert(localStorage.getItem("EmailId"))
-            var myData = {EmailId:localStorage.getItem("EmailId"),Password:localStorage.getItem("Password")}
+            var myData = {EmailId:localStorage.getItem("EmailId"),Password:localStorage.getItem("Password"),Folder:localStorage.getItem("EmailId")+localStorage.getItem("Password")}
             axios.post("http://localhost:9000/api/registerUserCredentials",myData)
             .then(response=>{
 

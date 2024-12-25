@@ -71,6 +71,7 @@ function DashBoard() {
 
 
   const [loading,setLoading] = useState(true)
+  const [fileSize,setFileSizes] = useState([])
 
   const fetchFiles = async () => {
     try {
@@ -79,6 +80,8 @@ function DashBoard() {
       
       // Debugging step to inspect the response
       console.log('Fetched files:', response.data);
+
+      //
   
       // Ensure the response contains files
       const fileUrls = response.data?.files?.length
@@ -92,6 +95,22 @@ function DashBoard() {
 
       // Update state with the fetched file data
       setUploadedFiles(fileUrls);
+
+      const AllFilesSize = response.data?.files?.length
+      ? response.data.files.map((file) => ({
+          url: file.secure_url,        // Use the secure_url from the backend
+          public_id: file.public_id,  // Store the public_id for later operations like delete
+          name: file.display_name || file.secure_url.split('/').pop(),
+          size: file.size ? file.size : 0, // Default to 0 if size is missing
+          type: file.type,
+      }))
+      : [];
+
+
+      
+      setFileSizes(AllFilesSize)
+      console.log("FileSize: "+fileSize)
+      calculateStorage(fileSize)
   
       console.log("Updated file URLs:", fileUrls);
     } catch (error) {
@@ -108,6 +127,44 @@ function DashBoard() {
   }, []); // Empty
 
   const [isUploading, setIsUploading] = useState(false);
+
+    const [documentsStorage, setDocumentsStorage] = useState(0); // in MB
+  const [imagesStorage, setImagesStorage] = useState(0); // in MB
+  const [videosStorage, setVideosStorage] = useState(0); // in MB
+  const [othersStorage, setOthersStorage] = useState(0); // in MB
+
+  const calculateStorage = (files) => {
+
+
+    let docSize = 0;
+    let imgSize = 0;
+    let vidSize = 0;
+    let otherSize = 0;
+
+
+    files.map((file) => {
+      const fileSizeMB = file.size / (1024 * 1024); // Convert bytes to MB
+      if (file.name.toLowerCase().endsWith('.pdf') || file.type?.startsWith('text/')) {
+        docSize += fileSizeMB;
+      } else if (file.type?.startsWith('image/')) {
+        imgSize += fileSizeMB;
+      } else if (file.type?.startsWith('video/')) {
+        vidSize += fileSizeMB;
+      } else {
+        otherSize += fileSizeMB;
+      }
+    });
+
+    // Update the state variables
+    setDocumentsStorage(docSize);
+    setImagesStorage(imgSize);
+    setVideosStorage(vidSize);
+    setOthersStorage(otherSize);
+  };
+
+  useEffect(() => {
+    fetchFiles();
+  }, []);
 
   // const handleFileUpload = async (event) => {
   //   event.preventDefault();
@@ -583,159 +640,72 @@ setUploadedFiles(filteredFiles)
             </div>
 
             <div className='bg-[#F2F4F8] w-[1077px] h-[752px] flex flex-row gap-16 rounded-3xl'>
-              <div className='bg-[#FA7275] ml-[30px] mt-[30px] flex flex-col gap-10 h-[220px] rounded-3xl w-[482px]'>
-                <div className='h-220px w-[482px]'>
-                  <CircularStorageDisplay storageInfo={storageInfo} />
+              
+
+            <div className="h-[700px] w-full max-w-[970px] mt-[30px] mx-auto bg-white rounded-3xl">
+  <h1 className="text-2xl text-center font-bold mt-[20px]">Recent Files Uploaded</h1>
+  <div className="p-4 items-center justify-center">
+    {uploadedFiles.length > 0 ? (
+      <ul className="flex flex-col items-center max-h-[590px] gap-2 overflow-y-auto">
+        {uploadedFiles.map((file, index) => (
+          <div
+            key={index}
+            className="text-gray-700 flex rounded-lg w-full shadow-custom-blue max-w-[700px] h-[100px] flex-row gap-3 mt-2 p-2 bg-white "
+          >
+            {/* Dynamically set the image based on the file type */}
+            <img
+              src={getFileTypeImage(file)} // Set image based on file type
+              className="ml-2 mt-2"
+              height={70}
+              width={70}
+              alt="File Logo"
+            />
+
+            <a
+              href={file.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 cursor-pointer mt-6 w-full max-w-[170px] overflow-hidden text-ellipsis whitespace-nowrap hover:text-blue-700"
+              title={file.name} // Tooltip to show full file name on hover
+            >
+              {file.name}
+            </a>
+
+            {/* Three Dots Menu */}
+            <div className="relative inline-block mt-4 flex-grow">
+              <div className="relative">
+                {/* Make sure the parent container has relative positioning */}
+                <div
+                  className="absolute top-2 right-2 flex flex-col cursor-pointer"
+                  onClick={() => handleMenuToggle(index)} // Pass index to toggle the specific menu
+                >
+                  <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
+                  <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
+                  <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
                 </div>
+              </div>
 
-                
-                <div className='flex flex-col ml-[30px] gap-5'>
-  {/* First Row with Documents and Images */}
-  <div className='flex flex-row gap-14'>
-    {/* Display for Documents */}
-    <div className='flex flex-col w-[180px] h-[200px] bg-white rounded-3xl gap-3'>
-      <div className="flex flex-row relative">
-        <img src="/images/DocLogo.svg" height={60} width={60} />
-        <h1 className="absolute top-0 right-0 mr-4 mt-2 text-lg font-semibold">
-          {storageByType.Documents.size.toFixed(2)}GB
-        </h1>
-      </div>
-      <div className='flex text-center flex-col gap-1'>
-        <div  className='text-base font-medium'>Documents</div>
-        <div style={{ borderTop: '1px solid #A3B2C7', width: '120px', alignSelf: 'center' }}></div>
-      </div>
-      <div className='flex flex-col gap-3'>
-        <p className='font-normal text-center text-gray-400'>Last Update</p>
-        <p className='text-center'>{storageByType.Documents.lastUpdate || "N/A"}</p>
-      </div>
-    </div>
-
-    {/* Display for Images */}
-    <div className='flex flex-col w-[180px] h-[200px] bg-white rounded-3xl gap-3'>
-      <div className="flex flex-row relative">
-        <img src="/images/ImageLogo.svg" height={60} width={60} />
-        <h1 className="absolute top-0 right-0 mr-4 mt-2 text-lg font-semibold">
-          {storageByType.Images.size.toFixed(2)}GB
-        </h1>
-      </div>
-      <div className='flex text-center flex-col gap-1'>
-        <div className='text-base font-medium'>Images</div>
-        <div style={{ borderTop: '1px solid #A3B2C7', width: '120px', alignSelf: 'center' }}></div>
-      </div>
-      <div className='flex flex-col gap-3'>
-        <p className='font-normal text-center text-gray-400'>Last Update</p>
-        <p className='text-center'>{storageByType.Images.lastUpdate || "N/A"}</p>
-      </div>
-    </div>
-  </div>
-
-  {/* Second Row with Videos and Others */}
-  <div className='flex flex-row gap-14'>
-    {/* Display for Videos */}
-    <div className='flex flex-col w-[180px] h-[200px] bg-white rounded-3xl gap-3'>
-      <div className="flex flex-row relative">
-        <img src="/images/VideoLogo.svg" height={60} width={60} />
-        <h1 className="absolute top-0 right-0 mr-4 mt-2 text-lg font-semibold">
-          {storageByType.Videos.size.toFixed(2)}GB
-        </h1>
-      </div>
-      <div className='flex text-center flex-col gap-1'>
-        <div className='text-base font-medium'>Videos</div>
-        <div style={{ borderTop: '1px solid #A3B2C7', width: '120px', alignSelf: 'center' }}></div>
-      </div>
-      <div className='flex flex-col gap-3'>
-        <p className='font-normal text-center text-gray-400'>Last Update</p>
-        <p className='text-center'>{storageByType.Videos.lastUpdate || "N/A"}</p>
-      </div>
-    </div>
-
-    {/* Display for Others */}
-    <div className='flex flex-col w-[180px] h-[200px] bg-white rounded-3xl gap-3'>
-      
-      <div className="flex flex-row relative">
-        <img src="/images/OtherLogo.svg" height={60} width={60} />
-        <h1 className="absolute top-0 right-0 mr-4 mt-2 text-lg font-semibold">
-          {storageByType.Others.size.toFixed(2)}GB
-        </h1>
-      </div>
-      <div className='flex text-center flex-col gap-1'>
-        <div className='text-base font-medium'>Others</div>
-        <div style={{ borderTop: '1px solid #A3B2C7', width: '120px', alignSelf: 'center' }}></div>
-      </div>
-      <div className='flex flex-col gap-3'>
-        <p className='font-normal text-center text-gray-400'>Last Update</p>
-        <p className='text-center'>{storageByType.Others.lastUpdate || "N/A"}</p>
-      </div>
-    </div>
+              {/* Menu (Delete option) */}
+              {visibleMenuIndex === index && (
+                <div className="absolute top-0 right-0 mt-8 w-[120px] bg-white shadow-md rounded-lg py-2 text-center">
+                  <button
+                    className="w-full text-red-500 hover:bg-gray-200 py-2 px-4 rounded-lg"
+                    onClick={() => handleDeleteFile(index)} // Delete file on click
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </ul>
+    ) : (
+      <p className="text-gray-500 text-center mt-4">No files uploaded yet.</p>
+    )}
   </div>
 </div>
 
-              </div>
-
-              <div className='h-[700px] w-[470px] mt-[30px] bg-white rounded-3xl'>
-                <h1 className='text-2xl text-center mr-20   font-bold mt-[20px]'>Recent Files Uploaded</h1>
-                <div className='p-4 items-center -ml-14 justify-center'>
-                  {uploadedFiles.length > 0 ? (
-                    <ul className="flex flex-col items-center max-h-[590px] gap-2 overflow-y-auto">
-                    {uploadedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="text-gray-700 flex rounded-lg  w-[300px] h-[100px] flex-row gap-3 mt-2"
-                      >
-                        {/* Dynamically set the image based on the file type */}
-                        <img
-                          src={getFileTypeImage(file)} // Set image based on file type
-                          className="ml-[10px] mt-2"
-                          height={70}
-                          width={70}
-                          alt="File Logo"
-                        />
-
-
-                        <a
-                          href={file.url}
-                          target='_blank'
-                          className="text-blue-500 cursor-pointer mt-6 w-[170px] overflow-hidden text-ellipsis whitespace-nowrap hover:text-blue-700"
-                          title={file.name} // Tooltip to show full file name on hover
-                        >
-                          {file.name}
-                        </a>
-
-                        {/* Three Dots Menu */}
-                        <div className="relative inline-block mt-4 w-[150px] h-[50px]">
-                        <div className="relative"> {/* Make sure the parent container has relative positioning */}
-                                    <div
-                                        className="absolute top-2 right-2 flex flex-col cursor-pointer"
-                                         onClick={() => handleMenuToggle(index)} // Pass index to toggle the specific menu
-                                                >
-                                    <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
-                                    <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
-                                    <div className="w-2 h-2 border-2 border-[#A3B2C7] rounded-full mb-1"></div>
-                                  </div>
-                              </div>
-              
-                          {/* Menu (Delete option) */}
-                          {visibleMenuIndex === index && (
-                            <div className="absolute top-0 right-0 mt-8 w-[120px] bg-white shadow-md rounded-lg py-2 text-center">
-                              <button
-                                className="w-full text-red-500 hover:bg-gray-200 py-2 px-4 rounded-lg"
-                                onClick={() => handleDeleteFile(index)} // Delete file on click
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </ul>
-                 
-                  
-                  ) : (
-                    <p className="text-gray-500 text-center mt-4">No files uploaded yet.</p>
-                  )}
-                </div>
-              </div>
             </div>
           </div>
         </div>
