@@ -64,13 +64,42 @@ function Images() {
     setVisibleMenuIndex(visibleMenuIndex === index ? null : index); // Toggle visibility
   };
 
-  const handleDeleteFile = (index) => {
-    const updatedFiles = [...uploadedFiles];
-    updatedFiles.splice(index, 1); // Remove the file at the given index
-    setUploadedFiles(updatedFiles);
-    updateStorageInfo(updatedFiles); // Update storage information after deletion
-    setVisibleMenuIndex(null); // Close the menu after deletion
+  const handleDeleteFile = async (index) => {
+    const fileToDelete = uploadedFiles[index];
+  
+    // First, we need to delete the file from Cloudinary
+    try {
+      const { public_id } = fileToDelete;  // Assume public_id is stored when the file is uploaded
+      alert(public_id);  // Debugging step to show public_id
+      
+
+      const response = await axios.post('http://localhost:9000/api/deleteFile', {
+        data: { public_id },  // Send public_id inside a "data" object
+      }, {
+        headers: {
+          'Content-Type': 'application/json',  // Ensure the header is set correctly
+        }
+      });
+      
+      if (response.data.success) {
+        alert('File deleted successfully from Cloudinary:', response.data);
+
+        const updatedFiles = uploadedFiles.filter(file => file.public_id !== public_id);
+
+      // Update uploadedFiles state with the new array
+        setUploadedFiles(updatedFiles);
+  
+        setVisibleMenuIndex(null); // Close the delete menu after deletion
+      } else {
+        console.error('File deletion failed:', response.data);
+        alert('File not deleted. Please try again later.'); // Inform user about failure
+      }
+  
+    } catch (error) {
+      console.error('Error deleting file from Cloudinary:', error);
+    }
   };
+  
 
   const fileTypeImages = {
     image: '/images/ImageLogo.svg',
@@ -78,7 +107,7 @@ function Images() {
 
   const getFileTypeImage = () => fileTypeImages.image;
 
-  const imageFiles = uploadedFiles.filter(file => file.type.startsWith('image/'));
+  
 
   const GoToDashboard = () => {
     window.location.href = '/dashboard';
@@ -107,52 +136,42 @@ function Images() {
 
 
     const [totalImageStorage, setTotalImageStorage] = useState(0); // in GB
-  
-  
-  const fetchDocuments = async () => {
-    try {
-      const response = await axios.get("http://localhost:9000/api/images");
-  
-      console.log(response.data); // Debugging step to inspect the response
-
-      // Filter only .pdf files from the response data
-      const pdfFiles = response.data.filter((file) => {
-        const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
-        return fileExtension === '.jpg' || fileExtension === '.png';  // Check if the extension is .jpg or .png
-      });  
-
-
-
-      const filterDuplicateFiles = (files) => {
-        // A Set to keep track of unique public_ids
-        const seen = new Set();
+    const fetchDocuments = async () => {
+      try {
+        // Fetch the file data from the backend
+        const response = await axios.get('http://localhost:9000/api/fetchFiles');
         
-        return files.filter(file => {
-          if (seen.has(file.name)) {
-            return false;  // Skip this file if the public_id is already in the Set
-          }
-          seen.add(file.name);  // Add the public_id to the Set
-          return true;  // Keep the file if it's unique
-        });
-      };
-      
-      // Assuming 'files' is the array you want to filter
-      const uniqueFiles = filterDuplicateFiles(pdfFiles);
-      
-      // Now, set the state with the unique files
-      setUploadedFiles(uniqueFiles);
-      
-      
-      // Set the filtered files to uploadedFiles
+        // Debugging step to inspect the response
+        console.log('Fetched files:', response.data);
+    
+        // Ensure the response contains files
+        const fileUrls = response.data?.files?.length
+          ? response.data.files.map((file) => ({
+              url: file.secure_url,        // Directly use the secure_url from the backend
+              public_id: file.public_id,   // Store the public_id for later operations like delete
+              name: file.display_name || file.secure_url.split('/').pop(),  // Use display_name if available
+          }))
+          : [];
   
-      // Calculate total size of the .pdf files
-      const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
-      setTotalImageStorage(totalSize / (1024 * 1024 * 1024)); // Convert to GB
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-    }
-  };
   
+          const imageFiles = fileUrls.filter((file) => 
+            file.url.toLowerCase().endsWith('.jpg') || file.url.toLowerCase().endsWith('.png')
+          );
+      
+        // Update state with the fetched file data
+        setUploadedFiles(imageFiles);
+    
+        console.log("Updated file URLs:", imageFiles);
+      } catch (error) {
+        console.error('Error fetching files:', error);
+        setUploadedFiles([]); // Reset files in case of an error
+      }
+    };
+  
+
+    
+        
+
   useEffect(() => {
     fetchDocuments();
   }, []);

@@ -91,7 +91,6 @@ function Documents() {
 
   const handleDeleteFile = async (index) => {
     const fileToDelete = uploadedFiles[index];
-    const newFiles = uploadedFiles.filter((_, i) => i !== index);
   
     // First, we need to delete the file from Cloudinary
     try {
@@ -204,6 +203,7 @@ function Documents() {
   //   }
   // };
 
+  
   const fetchDocuments = async () => {
     try {
       // Fetch the file data from the backend
