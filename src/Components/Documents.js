@@ -89,42 +89,45 @@ function Documents() {
   //   updateStorageInfo(uploadedFiles);
   // }, [uploadedFiles]);
 
-  const handleDeleteFile = (index) => {
-    // Delete the file from uploadedFiles state
-    const updatedFiles = [...uploadedFiles]; // Create a copy of the current files
-    const deletedFile = updatedFiles.splice(index, 1)[0]; // Remove the file at the given index
+  const handleDeleteFile = async (index) => {
+    const fileToDelete = uploadedFiles[index];
+    const newFiles = uploadedFiles.filter((_, i) => i !== index);
   
-    // Now update the uploadedFiles state
-    setUploadedFiles(updatedFiles);
+    // First, we need to delete the file from Cloudinary
+    try {
+      const { public_id } = fileToDelete;  // Assume public_id is stored when the file is uploaded
+      alert(public_id);  // Debugging step to show public_id
+      
+      // Send the public_id to the backend for deletion
+      const response = await axios.post('http://localhost:9000/api/deleteFile', {
+        data: { public_id },  // Send public_id inside a "data" object
+      }, {
+        headers: {
+          'Content-Type': 'application/json',  // Ensure the header is set correctly
+        }
+      });
+      
+      if (response.data.success) {
+        alert('File deleted successfully from Cloudinary:', response.data);
+
+        const updatedFiles = uploadedFiles.filter(file => file.public_id !== public_id);
+
+      // Update uploadedFiles state with the new array
+        setUploadedFiles(updatedFiles);
   
-    // Determine the type of the file (Documents, Images, Videos, Others)
-    const fileType = deletedFile.type;
-    let typeKey;
+        setVisibleMenuIndex(null); // Close the delete menu after deletion
+      } else {
+        console.error('File deletion failed:', response.data);
+        alert('File not deleted. Please try again later.'); // Inform user about failure
+      }
   
-    if (fileType.startsWith("image/")) {
-      typeKey = "Images";
-    } else if (fileType.startsWith("video/")) {
-      typeKey = "Videos";
-    } else if (fileType.startsWith("application/pdf") || fileType.startsWith("text/")) {
-      typeKey = "Documents";
-      setTotalDocumentStorage((prev) => prev - deletedFile.size / (1024 * 1024 * 1024)); // Subtract the file size from the total document storage
-    } else {
-      typeKey = "Others";
+    } catch (error) {
+      console.error('Error deleting file from Cloudinary:', error);
     }
-  
-    // Update the storage by type
-    setStorageByType((prev) => ({
-      ...prev,
-      [typeKey]: {
-        size: prev[typeKey].size - deletedFile.size / (1024 * 1024 * 1024), // Reduce the size by the deleted file's size
-        lastUpdate: new Date().toLocaleDateString(), // Update the last update date
-      },
-    }));
-  
-    // Close the menu after deletion
-    setVisibleMenuIndex(null);
   };
   
+  
+
   const handleOpenFile = (file) => {
     if (file.url) {
       // Check if the file has a .pdf.pdf extension
@@ -182,25 +185,55 @@ function Documents() {
     window.location.href = '/documents'
   }
 
+  // const fetchDocuments = async () => {
+  //   try {
+  //     const response = await axios.get("http://localhost:9000/api/documents");
+  
+  //     console.log(response.data); // Debugging step to inspect the response
+  
+  //     // Filter only .pdf files from the response data
+  
+  //     // Set the filtered files to uploadedFiles
+  //     setUploadedFiles(pdfFiles);
+  
+  //     // Calculate total size of the .pdf files
+  //     const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
+  //     setTotalDocumentStorage(totalSize / (1024 * 1024 * 1024)); // Convert to GB
+  //   } catch (error) {
+  //     console.error("Error fetching documents:", error);
+  //   }
+  // };
+
   const fetchDocuments = async () => {
     try {
-      const response = await axios.get("http://localhost:9000/api/documents");
+      // Fetch the file data from the backend
+      const response = await axios.get('http://localhost:9000/api/fetchFiles');
+      
+      // Debugging step to inspect the response
+      console.log('Fetched files:', response.data);
   
-      console.log(response.data); // Debugging step to inspect the response
-  
-      // Filter only .pdf files from the response data
-      const pdfFiles = response.data.filter((file) => file.name.toLowerCase().endsWith('.pdf'));
-  
-      // Set the filtered files to uploadedFiles
+      // Ensure the response contains files
+      const fileUrls = response.data?.files?.length
+        ? response.data.files.map((file) => ({
+            url: file.secure_url,        // Directly use the secure_url from the backend
+            public_id: file.public_id,   // Store the public_id for later operations like delete
+            name: file.display_name || file.secure_url.split('/').pop(),  // Use display_name if available
+        }))
+        : [];
+
+        const pdfFiles = fileUrls.filter((file) => file.name.toLowerCase().endsWith('.pdf'));
+
+
+      // Update state with the fetched file data
       setUploadedFiles(pdfFiles);
   
-      // Calculate total size of the .pdf files
-      const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
-      setTotalDocumentStorage(totalSize / (1024 * 1024 * 1024)); // Convert to GB
+      console.log("Updated file URLs:", pdfFiles);
     } catch (error) {
-      console.error("Error fetching documents:", error);
+      console.error('Error fetching files:', error);
+      setUploadedFiles([]); // Reset files in case of an error
     }
   };
+
   
   useEffect(() => {
     fetchDocuments();
@@ -213,6 +246,33 @@ function Documents() {
     }
   }, []);
   
+
+   const [searchQuery, setSearchQuery] = useState('');
+  
+    const [previousFiles, setPreviousFiles] = useState(uploadedFiles);
+  
+    useEffect(() => {
+      if (searchQuery === '') {
+        setPreviousFiles(uploadedFiles); // Store the current files if the search is cleared
+      }
+  
+    }, [uploadedFiles]);
+  
+  // Handle the search query change
+  const handleSearchChange = (event) => {
+    const query = event.target.value.toLowerCase();
+    setSearchQuery(query);
+    
+  
+    const filteredFiles = searchQuery
+    ? uploadedFiles.filter(file =>
+        file.name.toLowerCase().includes(searchQuery)
+      )
+    : previousFiles;
+  
+  setUploadedFiles(filteredFiles)
+  
+  };
 
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
@@ -228,6 +288,8 @@ function Documents() {
               <input
                 placeholder="Search"
                 className="w-full text-left border-none rounded focus:outline-none focus:ring-0"
+                value={searchQuery} // Set the search query as the value
+                onChange={handleSearchChange}
               />
             </div>
             <div className='flex flex-row gap-4 ml-auto pr-[40px]'>

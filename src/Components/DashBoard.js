@@ -89,6 +89,7 @@ function DashBoard() {
         }))
         : [];
 
+
       // Update state with the fetched file data
       setUploadedFiles(fileUrls);
   
@@ -101,159 +102,12 @@ function DashBoard() {
     }
   };
 
-  // const fetchFiles = async () => {
-  //   try {
-  //     const response = await axios.get('http://localhost:9000/api/fetchFiles');
-      
-  //     // Debugging step to inspect the response
-  //     console.log('Fetched files:', response.data);
-  
-  //     const fileUrls = response.data?.length
-  // ? response.data
-  //     .reduce((uniqueFiles, file) => {
-  //       // Check if the file URL is already added in the uniqueFiles array
-  //       if (!uniqueFiles.some((uniqueFile) => uniqueFile.url === file.secure_url)) {
-  //         // Get the file URL
-  //         let fileUrl = file.secure_url;
-
-  //         // Only add '.pdf' if the file URL ends with '.pdf'
-  //         if (fileUrl.endsWith('.pdf') && !fileUrl.endsWith('.pdf.pdf')) {
-  //           fileUrl += '.pdf';  // Add .pdf to the URL
-  //         }
-
-  //         uniqueFiles.push({
-  //           url: fileUrl,  // Use the modified URL with the .pdf extension
-  //           name: file.display_name || file.secure_url.split('/').pop(),  // Use display name or fallback to URL basename
-  //         });
-  //       }
-  //       return uniqueFiles;
-  //     }, [])
-  // : [];
-
-    
-    
-
-  //     console.log("FileUrls")
-  
-  //     console.log(fileUrls)
-  //     setUploadedFiles(fileUrls); // Update state with sanitized files
-  //   } catch (error) {
-  //     console.error('Error fetching files:', error);
-  //     setUploadedFiles([]); // Reset files in case of an error
-  //   } finally {
-  //     setLoading(false); // Stop loading after fetching
-  //   }
-  // };
-  
   useEffect(() => {
     fetchFiles(); // Call the fetchFiles function after the component mounts
     alert("Loading files..")
   }, []); // Empty
 
   const [isUploading, setIsUploading] = useState(false);
-
-  const handleFileUpload = async (event) => {
-    event.preventDefault();
-  
-    if (isUploading) {
-      console.log("Upload already in progress.");
-      return;
-    }
-  
-    setIsUploading(true);
-    console.log("Upload started.");
-  
-    const files = Array.from(event.target.files);
-    if (files.length === 0) {
-      console.log("No files selected.");
-      setIsUploading(false);
-      return;
-    }
-  
-    setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
-  
-    // Normalize the file names to handle small variations
-    const normalizeFileName = (filename) => {
-      return filename.trim().toLowerCase().replace(/\s+/g, '_');
-    };
-  
-    // Filter out duplicate files based on name and size
-    const uniqueFiles = [];
-    files.forEach((file) => {
-      const normalizedFileName = normalizeFileName(file.name);
-      const isDuplicate = uploadedFiles.some(uploadedFile =>
-        normalizeFileName(uploadedFile.name) === normalizedFileName && uploadedFile.size === file.size
-      );
-  
-      if (!isDuplicate) {
-        uniqueFiles.push(file);
-      } else {
-        console.log(`Skipping duplicate file: ${file.name}`);
-      }
-    });
-  
-    // Log files for debugging
-    console.log("Files after filtering duplicates:", uniqueFiles);
-  
-    if (uniqueFiles.length === 0) {
-      console.log("No unique files to upload.");
-      setIsUploading(false);
-      return;
-    }
-  
-    // Map files to the file URLs
-    const fileUrls = uniqueFiles.map((file) => ({
-      name: file.name,
-      url: URL.createObjectURL(file),
-      size: file.size,
-      type: file.type,
-    }));
-  
-    // Add these unique files to the uploaded files state
-    setUploadedFiles((prevFiles) => [...prevFiles, ...fileUrls]);
-  
-    // Categorize and store files locally
-    fileUrls.forEach(categorizeAndStoreFile);
-  
-    const formData = new FormData();
-    uniqueFiles.forEach((file) => {
-      formData.append('files', file);
-    });
-  
-    try {
-      console.log("Sending files to the backend...");
-      const response = await axios.post('http://localhost:9000/api/fileUpload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      console.log('Files uploaded successfully', response.data);
-  
-      // Assuming response contains the file URLs and public_ids
-      if (response.data.success) {
-        const uploadedFileUrls = response.data.fileUrls; // Array of URLs from Cloudinary response
-        const uploadedPublicIds = response.data.public_ids; // Array of public_ids from Cloudinary response
-  
-        // Map the uploaded files with URLs, public_ids, and other details
-        const updatedFiles = uniqueFiles.map((file, index) => ({
-          name: file.name,
-          size: file.size,
-          url: uploadedFileUrls[index],  // URL from Cloudinary response
-          public_id: uploadedPublicIds[index],  // public_id from Cloudinary response
-          type: file.type,
-        }));
-  
-        // Add these updated files to the uploaded files state
-        setUploadedFiles((prevFiles) => [...prevFiles, ...updatedFiles]);
-      } else {
-        console.error('Error uploading files:', response.data);
-      }
-    } catch (error) {
-      console.error('Error uploading files:', error);
-    } finally {
-      setIsUploading(false);
-      console.log("Upload complete.");
-    }
-  };
-  
 
   // const handleFileUpload = async (event) => {
   //   event.preventDefault();
@@ -272,9 +126,8 @@ function DashBoard() {
   //     setIsUploading(false);
   //     return;
   //   }
-
+  
   //   setUploadedFiles((prevFiles) => [...fileUrls, ...prevFiles]);
-
   
   //   // Normalize the file names to handle small variations
   //   const normalizeFileName = (filename) => {
@@ -285,7 +138,7 @@ function DashBoard() {
   //   const uniqueFiles = [];
   //   files.forEach((file) => {
   //     const normalizedFileName = normalizeFileName(file.name);
-  //     const isDuplicate = uploadedFiles.some(uploadedFile => 
+  //     const isDuplicate = uploadedFiles.some(uploadedFile =>
   //       normalizeFileName(uploadedFile.name) === normalizedFileName && uploadedFile.size === file.size
   //     );
   
@@ -313,7 +166,6 @@ function DashBoard() {
   //     type: file.type,
   //   }));
   
-
   //   // Add these unique files to the uploaded files state
   //   setUploadedFiles((prevFiles) => [...prevFiles, ...fileUrls]);
   
@@ -324,13 +176,33 @@ function DashBoard() {
   //   uniqueFiles.forEach((file) => {
   //     formData.append('files', file);
   //   });
-
+  
   //   try {
   //     console.log("Sending files to the backend...");
   //     const response = await axios.post('http://localhost:9000/api/fileUpload', formData, {
   //       headers: { 'Content-Type': 'multipart/form-data' },
   //     });
   //     console.log('Files uploaded successfully', response.data);
+  
+  //     // Assuming response contains the file URLs and public_ids
+  //     if (response.data.success) {
+  //       const uploadedFileUrls = response.data.fileUrls; // Array of URLs from Cloudinary response
+  //       const uploadedPublicIds = response.data.public_ids; // Array of public_ids from Cloudinary response
+  
+  //       // Map the uploaded files with URLs, public_ids, and other details
+  //       const updatedFiles = uniqueFiles.map((file, index) => ({
+  //         name: file.name,
+  //         size: file.size,
+  //         url: uploadedFileUrls[index],  // URL from Cloudinary response
+  //         public_id: uploadedPublicIds[index],  // public_id from Cloudinary response
+  //         type: file.type,
+  //       }));
+  
+  //       // Add these updated files to the uploaded files state
+  //       setUploadedFiles((prevFiles) => [...prevFiles, ...updatedFiles]);
+  //     } else {
+  //       console.error('Error uploading files:', response.data);
+  //     }
   //   } catch (error) {
   //     console.error('Error uploading files:', error);
   //   } finally {
@@ -338,6 +210,119 @@ function DashBoard() {
   //     console.log("Upload complete.");
   //   }
   // };
+  
+
+  const handleFileUpload = async (event) => {
+    event.preventDefault();
+  
+    if (isUploading) {
+      console.log("Upload already in progress.");
+      return;
+    }
+  
+    setIsUploading(true);
+    console.log("Upload started.");
+  
+    const files = Array.from(event.target.files);
+    if (files.length === 0) {
+      console.log("No files selected.");
+      setIsUploading(false);
+      return;
+    }
+  
+    // Normalize the file names to handle small variations
+    const normalizeFileName = (filename) => {
+      return filename.trim().toLowerCase().replace(/\s+/g, '_');
+    };
+  
+    // Filter out duplicate files based on name and size
+    const uniqueFiles = [];
+    const seenFileKeys = new Set();  // Use this to track file keys and avoid duplicates
+  
+    files.forEach((file) => {
+      const normalizedFileName = normalizeFileName(file.name);
+      const fileKey = `${normalizedFileName}_${file.size}`;
+  
+      if (!seenFileKeys.has(fileKey)) {
+        uniqueFiles.push(file);
+        seenFileKeys.add(fileKey); // Track the file key to avoid duplicates
+      } else {
+        console.log(`Skipping duplicate file: ${file.name}`);
+      }
+    });
+  
+    // Log files for debugging
+    console.log("Files after filtering duplicates:", uniqueFiles);
+  
+    if (uniqueFiles.length === 0) {
+      console.log("No unique files to upload.");
+      setIsUploading(false);
+      return;
+    }
+  
+    // Immediately update uploadedFiles state with unique files before uploading
+    setUploadedFiles(prevFiles => {
+      const updatedFiles = uniqueFiles.map((file) => ({
+        name: file.name,
+        size: file.size,
+        url: URL.createObjectURL(file), // You can use the URL.createObjectURL or leave it empty for now
+        type: file.type,
+        public_id: null, // Initially set public_id as null, which will be updated later
+      }));
+  
+      return [...prevFiles, ...updatedFiles]; // Append new files to the existing state
+    });
+  
+    // Prepare FormData with unique files
+    const formData = new FormData();
+    uniqueFiles.forEach((file) => {
+      formData.append('files', file);
+    });
+  
+    try {
+      console.log("Sending files to the backend...");
+      const response = await axios.post('http://localhost:9000/api/fileUpload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+  
+      console.log('Files uploaded successfully', response.data);
+  
+      // Assuming response contains the file URLs and public_ids
+      if (response.data.success) {
+        const uploadedFileUrls = response.data.fileUrls; // Array of URLs from Cloudinary response
+        const uploadedPublicIds = response.data.public_ids; // Array of public_ids from Cloudinary response
+  
+        // Map the uploaded files with URLs, public_ids, and other details
+        const updatedFiles = uniqueFiles.map((file, index) => ({
+          name: file.name,
+          size: file.size,
+          url: uploadedFileUrls[index],  // URL from Cloudinary response
+          public_id: uploadedPublicIds[index],  // public_id from Cloudinary response
+          type: file.type,
+        }));
+  
+        // Add these updated files to the uploaded files state
+        setUploadedFiles(prevFiles => {
+          return prevFiles.map(file => {
+            const updatedFile = updatedFiles.find(f => f.name === file.name && f.size === file.size);
+            return updatedFile ? updatedFile : file;
+          });
+        });
+  
+        console.log("State updated successfully:", updatedFiles);
+      } else {
+        console.error('Error uploading files:', response.data);
+      }
+    } catch (error) {
+      console.error('Error uploading files:', error);
+    } finally {
+      setIsUploading(false);
+      console.log("Upload complete.");
+    }
+  };
+  
+  
+  
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -396,7 +381,12 @@ setUploadedFiles(filteredFiles)
       });
       
       if (response.data.success) {
-        console.log('File deleted successfully from Cloudinary:', response.data);
+        alert('File deleted successfully from Cloudinary:', response.data);
+
+        const updatedFiles = uploadedFiles.filter(file => file.public_id !== public_id);
+
+      // Update uploadedFiles state with the new array
+        setUploadedFiles(updatedFiles);
   
         // After successful deletion from Cloudinary, update the storage state
         const typeKey = categorizeFileType(fileToDelete);
@@ -406,12 +396,14 @@ setUploadedFiles(filteredFiles)
             size: prev[typeKey].size - fileToDelete.size / (1024 * 1024 * 1024), // Subtract GB
             lastUpdate: new Date().toLocaleDateString(),
           },
+
         }));
-  
+
+        
+
         // Update total storage info
         updateStorageInfo(newFiles);
   
-        setUploadedFiles(newFiles); // Update the state by removing the file
         setVisibleMenuIndex(null); // Close the delete menu after deletion
       } else {
         console.error('File deletion failed:', response.data);
@@ -420,7 +412,6 @@ setUploadedFiles(filteredFiles)
   
     } catch (error) {
       console.error('Error deleting file from Cloudinary:', error);
-      alert('Error occurred while deleting the file. Please try again later.'); // Show error message to user
     }
   };
   

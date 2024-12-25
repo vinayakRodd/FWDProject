@@ -114,16 +114,36 @@ function Images() {
       const response = await axios.get("http://localhost:9000/api/images");
   
       console.log(response.data); // Debugging step to inspect the response
-  
+
       // Filter only .pdf files from the response data
       const pdfFiles = response.data.filter((file) => {
         const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
         return fileExtension === '.jpg' || fileExtension === '.png';  // Check if the extension is .jpg or .png
       });  
-      
 
+
+
+      const filterDuplicateFiles = (files) => {
+        // A Set to keep track of unique public_ids
+        const seen = new Set();
+        
+        return files.filter(file => {
+          if (seen.has(file.name)) {
+            return false;  // Skip this file if the public_id is already in the Set
+          }
+          seen.add(file.name);  // Add the public_id to the Set
+          return true;  // Keep the file if it's unique
+        });
+      };
+      
+      // Assuming 'files' is the array you want to filter
+      const uniqueFiles = filterDuplicateFiles(pdfFiles);
+      
+      // Now, set the state with the unique files
+      setUploadedFiles(uniqueFiles);
+      
+      
       // Set the filtered files to uploadedFiles
-      setUploadedFiles(pdfFiles);
   
       // Calculate total size of the .pdf files
       const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
