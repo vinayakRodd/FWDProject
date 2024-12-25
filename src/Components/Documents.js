@@ -184,26 +184,8 @@ function Documents() {
     window.location.href = '/documents'
   }
 
-  // const fetchDocuments = async () => {
-  //   try {
-  //     const response = await axios.get("http://localhost:9000/api/documents");
-  
-  //     console.log(response.data); // Debugging step to inspect the response
-  
-  //     // Filter only .pdf files from the response data
-  
-  //     // Set the filtered files to uploadedFiles
-  //     setUploadedFiles(pdfFiles);
-  
-  //     // Calculate total size of the .pdf files
-  //     const totalSize = pdfFiles.reduce((acc, file) => acc + file.size, 0);
-  //     setTotalDocumentStorage(totalSize / (1024 * 1024 * 1024)); // Convert to GB
-  //   } catch (error) {
-  //     console.error("Error fetching documents:", error);
-  //   }
-  // };
 
-  
+
   const fetchDocuments = async () => {
     try {
       // Fetch the file data from the backend
@@ -214,18 +196,23 @@ function Documents() {
   
       // Ensure the response contains files
       const fileUrls = response.data?.files?.length
-        ? response.data.files.map((file) => ({
-            url: file.secure_url,        // Directly use the secure_url from the backend
-            public_id: file.public_id,   // Store the public_id for later operations like delete
-            name: file.display_name || file.secure_url.split('/').pop(),  // Use display_name if available
-        }))
-        : [];
+      ? response.data.files.map((file) => ({
+          url: file.secure_url,        // Use the secure_url from the backend
+          public_id: file.public_id,  // Store the public_id for later operations like delete
+          name: file.display_name || file.secure_url.split('/').pop(),
+          size: file.size ? file.size : 0, // Default to 0 if size is missing
+          type: file.type,
+      }))
+      : [];
+        
 
         const pdfFiles = fileUrls.filter((file) => file.name.toLowerCase().endsWith('.pdf'));
 
 
       // Update state with the fetched file data
       setUploadedFiles(pdfFiles);
+
+
   
       console.log("Updated file URLs:", pdfFiles);
     } catch (error) {
@@ -273,6 +260,14 @@ function Documents() {
   setUploadedFiles(filteredFiles)
   
   };
+
+  const [totalUsedSpace, setTotalUsedSpace] = useState(0);
+
+// Calculate total space whenever uploadedFiles changes
+useEffect(() => {
+  const totalSize = uploadedFiles.reduce((acc, file) => acc + file.size, 0); // Sum file sizes
+  setTotalUsedSpace(totalSize / (1024 * 1024)); // Convert to MB
+}, [uploadedFiles]);
 
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
@@ -386,10 +381,10 @@ function Documents() {
             {/* Documents Content */}
             <div className='bg-[#F2F4F8] w-[1127px] h-[752px] flex flex-col gap-5 rounded-3xl'>
               <h1 className='text-5xl font-bold ml-[50px] mt-[40px]'>Documents</h1>
-              <p className='text-2xl font-medium ml-[50px]'>
-                Total Space Used by Documents: {totalDocumentStorage.toFixed(2)} GB
-              </p>
-
+            
+<p className='text-2xl font-medium ml-[50px]'>
+  Total Space Used by Documents: {totalUsedSpace.toFixed(2)} MB
+</p>
               <div className='flex flex-row w-[1070px] overflow-y-scroll h-[700px] mt-[20px] ml-[50px] flex-wrap gap-5'>
   {uploadedFiles.length > 0 ? (
     uploadedFiles.map((file, index) => (
@@ -427,6 +422,7 @@ function Documents() {
           </div>
         </div>
         <p className="text-lg font-semibold truncate w-full" title={file.name}>{file.name}</p>
+        <p className="text-sm text-gray-600">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
       </div>
     ))
   ) : (

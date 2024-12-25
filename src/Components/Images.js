@@ -107,8 +107,6 @@ function Images() {
 
   const getFileTypeImage = () => fileTypeImages.image;
 
-  
-
   const GoToDashboard = () => {
     window.location.href = '/dashboard';
   };
@@ -135,7 +133,7 @@ function Images() {
   };
 
 
-    const [totalImageStorage, setTotalImageStorage] = useState(0); // in GB
+    const [totalImageStorage, setTotalImageStorage] = useState(0); 
     const fetchDocuments = async () => {
       try {
         // Fetch the file data from the backend
@@ -146,12 +144,14 @@ function Images() {
     
         // Ensure the response contains files
         const fileUrls = response.data?.files?.length
-          ? response.data.files.map((file) => ({
-              url: file.secure_url,        // Directly use the secure_url from the backend
-              public_id: file.public_id,   // Store the public_id for later operations like delete
-              name: file.display_name || file.secure_url.split('/').pop(),  // Use display_name if available
-          }))
-          : [];
+        ? response.data.files.map((file) => ({
+            url: file.secure_url,        // Use the secure_url from the backend
+            public_id: file.public_id,  // Store the public_id for later operations like delete
+            name: file.display_name || file.secure_url.split('/').pop(),
+            size: file.size ? file.size : 0, // Default to 0 if size is missing
+            type: file.type,
+        }))
+        : [];
   
   
           const imageFiles = fileUrls.filter((file) => 
@@ -167,8 +167,32 @@ function Images() {
         setUploadedFiles([]); // Reset files in case of an error
       }
     };
-  
 
+     const [searchQuery, setSearchQuery] = useState('');
+      
+        const [previousFiles, setPreviousFiles] = useState(uploadedFiles);
+      
+        useEffect(() => {
+          if (searchQuery === '') {
+            setPreviousFiles(uploadedFiles); // Store the current files if the search is cleared
+          }
+      
+        }, [uploadedFiles]);
+  
+    const handleSearchChange = (event) => {
+      const query = event.target.value.toLowerCase();
+      setSearchQuery(query);
+      
+    
+      const filteredFiles = searchQuery
+      ? uploadedFiles.filter(file =>
+          file.name.toLowerCase().includes(searchQuery)
+        )
+      : previousFiles;
+    
+    setUploadedFiles(filteredFiles)
+    
+    };
     
         
 
@@ -182,6 +206,16 @@ function Images() {
       setUploadedFiles(urls);
     }
   }, []);
+
+
+  const [totalUsedSpace, setTotalUsedSpace] = useState(0);
+  
+  // Calculate total space whenever uploadedFiles changes
+  useEffect(() => {
+    const totalSize = uploadedFiles.reduce((acc, file) => acc + file.size, 0); // Sum file sizes
+    setTotalUsedSpace(totalSize / (1024 * 1024)); // Convert to MB
+  }, [uploadedFiles]);
+  
   
   return (
     <div className='flex flex-col h-[1000px] gap-5'>
@@ -197,6 +231,8 @@ function Images() {
               <input
                 placeholder="Search"
                 className="w-full text-left border-none rounded focus:outline-none focus:ring-0"
+                value={searchQuery} // Set the search query as the value
+                onChange={handleSearchChange}
               />
             </div>
             <div className='flex flex-row gap-4 ml-auto pr-[40px]'>
@@ -299,8 +335,8 @@ function Images() {
           
             
               <p className='text-2xl font-medium ml-[50px]'>
-                Total Space Used by Documents: {totalImageStorage.toFixed(2)} GB
-              </p>
+  Total Space Used by Documents: {totalUsedSpace.toFixed(2)} MB
+</p>
 
               <div className='flex flex-row w-[1070px] overflow-y-scroll h-[700px] mt-[20px] ml-[50px] flex-wrap gap-5'>
                 {uploadedFiles.length > 0 ? (
